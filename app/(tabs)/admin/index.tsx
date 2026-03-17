@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -42,7 +42,57 @@ type Poll = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  counts?: { a: number; b: number; total: number };
 };
+
+function MiniBarChart({ countA, countB, total }: { countA: number; countB: number; total: number }) {
+  const widthA = useRef(new Animated.Value(0)).current;
+  const widthB = useRef(new Animated.Value(0)).current;
+
+  const pctA = total > 0 ? countA / total : 0;
+  const pctB = total > 0 ? countB / total : 0;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(widthA, { toValue: pctA, duration: 600, delay: 100, useNativeDriver: false }),
+      Animated.timing(widthB, { toValue: pctB, duration: 600, delay: 200, useNativeDriver: false }),
+    ]).start();
+  }, [pctA, pctB]);
+
+  const totalDisplay = total.toString();
+
+  if (total === 0) {
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
+        <View style={{ flex: 1, height: 8, borderRadius: 4, backgroundColor: '#F0F0F5' }} />
+        <Text style={{ fontSize: 11, fontWeight: '600', color: COLORS.textSecondary }}>0 votes</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
+      <View style={{ flex: 1, flexDirection: 'row', gap: 3, height: 8 }}>
+        <Animated.View style={{
+          flex: widthA,
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: COLORS.coral,
+        }} />
+        <Animated.View style={{
+          flex: widthB,
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: COLORS.blue,
+        }} />
+      </View>
+      <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.textSecondary }}>
+        {totalDisplay}
+        <Text style={{ fontWeight: '400' }}> votes</Text>
+      </Text>
+    </View>
+  );
+}
 
 function PollCard({ poll, index, onPress }: { poll: Poll; index: number; onPress: () => void }) {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -62,6 +112,10 @@ function PollCard({ poll, index, onPress }: { poll: Poll; index: number; onPress
   const handlePressOut = () => {
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
   };
+
+  const countA = poll.counts?.a ?? 0;
+  const countB = poll.counts?.b ?? 0;
+  const countTotal = poll.counts?.total ?? 0;
 
   return (
     <Animated.View style={{ opacity, transform: [{ translateY }, { scale }], marginBottom: 12 }}>
@@ -127,6 +181,9 @@ function PollCard({ poll, index, onPress }: { poll: Poll; index: number; onPress
               <Text style={{ color: COLORS.border }}> vs </Text>
               {poll.option_b_label}
             </Text>
+
+            {/* Mini bar chart */}
+            <MiniBarChart countA={countA} countB={countB} total={countTotal} />
           </View>
 
           <View style={{
@@ -167,7 +224,27 @@ export default function AdminScreen() {
       const data = await res.json();
       const pollList: Poll[] = data.polls ?? data;
       console.log('[AdminScreen] Polls loaded:', pollList.length, 'polls');
-      setPolls(pollList);
+
+      // Check if counts are already included; if not, fetch individually
+      const hasCounts = pollList.length > 0 && pollList[0].counts !== undefined;
+      if (!hasCounts && pollList.length > 0) {
+        console.log('[AdminScreen] Counts not in list response — fetching individually');
+        const withCounts = await Promise.all(
+          pollList.map(async (p) => {
+            try {
+              const r = await fetch(`${BASE_URL}/api/polls/${p.id}`);
+              if (!r.ok) return p;
+              const d = await r.json();
+              return { ...p, counts: d.counts };
+            } catch {
+              return p;
+            }
+          })
+        );
+        setPolls(withCounts);
+      } else {
+        setPolls(pollList);
+      }
       setError(null);
     } catch (e) {
       console.error('[AdminScreen] Network error:', e);
@@ -222,7 +299,11 @@ export default function AdminScreen() {
         <Text style={{ fontSize: 22, fontWeight: '800', color: COLORS.text, marginTop: 16, textAlign: 'center' }}>Oops!</Text>
         <Text style={{ fontSize: 16, color: COLORS.textSecondary, marginTop: 8, textAlign: 'center' }}>{error}</Text>
         <Pressable
-          onPress={() => { setLoading(true); fetchPolls().finally(() => setLoading(false)); }}
+          onPress={() => {
+            console.log('[AdminScreen] User pressed retry');
+            setLoading(true);
+            fetchPolls().finally(() => setLoading(false));
+          }}
           style={{ marginTop: 24, backgroundColor: COLORS.purple, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 20 }}
         >
           <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>Try again</Text>

@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Trash2, RotateCcw, Save, CheckCircle, ImageIcon } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { DonutChart } from '@/components/DonutChart';
 
 const BASE_URL = 'https://at52tm8me4yfm63sgxb9tx3u2csxcjqs.app.specular.dev';
 
@@ -50,6 +51,8 @@ type PollForm = {
   option_b_emoji: string;
   is_active: boolean;
 };
+
+type Counts = { a: number; b: number; total: number };
 
 function resolveImageSource(source: string | number | ImageSourcePropType | undefined): ImageSourcePropType {
   if (!source) return { uri: '' };
@@ -108,6 +111,69 @@ function FormField({
   );
 }
 
+function CompactResultBar({
+  emoji,
+  label,
+  count,
+  total,
+  color,
+  colorLight,
+}: {
+  emoji: string;
+  label: string;
+  count: number;
+  total: number;
+  color: string;
+  colorLight: string;
+}) {
+  const barAnim = useRef(new Animated.Value(0)).current;
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+
+  useEffect(() => {
+    barAnim.setValue(0);
+    Animated.timing(barAnim, {
+      toValue: pct / 100,
+      duration: 700,
+      delay: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [pct]);
+
+  const pctDisplay = pct + '%';
+  const countDisplay = count.toString();
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+      {/* Left: emoji + label */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, width: 90 }}>
+        <Text style={{ fontSize: 18 }}>{emoji}</Text>
+        <Text style={{ fontSize: 12, fontWeight: '700', color: COLORS.text, flex: 1 }} numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
+
+      {/* Bar */}
+      <View style={{ flex: 1, height: 10, backgroundColor: colorLight, borderRadius: 5, overflow: 'hidden' }}>
+        <Animated.View style={{
+          height: '100%',
+          width: barAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+          backgroundColor: color,
+          borderRadius: 5,
+        }} />
+      </View>
+
+      {/* Right: pct + count */}
+      <View style={{ alignItems: 'flex-end', width: 64 }}>
+        <Text style={{ fontSize: 14, fontWeight: '800', color }}>{pctDisplay}</Text>
+        <Text style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: '600' }}>
+          {countDisplay}
+          <Text style={{ fontWeight: '400' }}> votes</Text>
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 export default function PollEditScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
@@ -124,6 +190,7 @@ export default function PollEditScreen() {
     option_b_emoji: '👎',
     is_active: false,
   });
+  const [counts, setCounts] = useState<Counts | null>(null);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -155,7 +222,7 @@ export default function PollEditScreen() {
       })
       .then(data => {
         if (!data) return;
-        console.log('[PollEdit] Poll loaded:', data.id, data.title);
+        console.log('[PollEdit] Poll loaded:', data.id, data.title, 'counts:', data.counts);
         setForm({
           title: data.title ?? '',
           description: data.description ?? '',
@@ -166,6 +233,9 @@ export default function PollEditScreen() {
           option_b_emoji: data.option_b_emoji ?? '👎',
           is_active: data.is_active ?? false,
         });
+        if (data.counts) {
+          setCounts(data.counts);
+        }
       })
       .catch(e => {
         console.error('[PollEdit] Network error loading poll:', e);
@@ -243,6 +313,7 @@ export default function PollEditScreen() {
               }
               const data = await res.json();
               console.log('[PollEdit] Reset success:', data);
+              setCounts({ a: 0, b: 0, total: 0 });
               Alert.alert('Done!', 'Votes have been reset.');
             } catch (e) {
               console.error('[PollEdit] Reset network error:', e);
@@ -383,6 +454,75 @@ export default function PollEditScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* ── Results Summary (edit mode only) ── */}
+          {isEditing && counts !== null && (
+            <View style={{
+              backgroundColor: COLORS.surface,
+              borderRadius: 20,
+              padding: 20,
+              marginBottom: 16,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+              borderWidth: 1,
+              borderColor: COLORS.border,
+            }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.purple, marginBottom: 16, letterSpacing: 1, textTransform: 'uppercase' }}>
+                📊 Results Summary
+              </Text>
+
+              {/* Compact bar chart */}
+              <CompactResultBar
+                emoji={form.option_a_emoji}
+                label={form.option_a_label}
+                count={counts.a}
+                total={counts.total}
+                color={COLORS.coral}
+                colorLight={COLORS.coralLight}
+              />
+              <CompactResultBar
+                emoji={form.option_b_emoji}
+                label={form.option_b_label}
+                count={counts.b}
+                total={counts.total}
+                color={COLORS.blue}
+                colorLight={COLORS.blueLight}
+              />
+
+              {/* Donut chart */}
+              <View style={{ alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
+                <DonutChart
+                  valueA={counts.a}
+                  valueB={counts.b}
+                  labelA={form.option_a_label}
+                  labelB={form.option_b_label}
+                  colorA={COLORS.coral}
+                  colorB={COLORS.blue}
+                  size={160}
+                  strokeWidth={18}
+                />
+              </View>
+
+              {/* Reset votes button — lives here near the chart */}
+              <Pressable
+                onPress={handleResetVotes}
+                style={{
+                  marginTop: 16,
+                  backgroundColor: COLORS.surface,
+                  borderRadius: 14,
+                  paddingVertical: 13,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'row',
+                  gap: 8,
+                  borderWidth: 2,
+                  borderColor: COLORS.blue,
+                }}
+              >
+                <RotateCcw size={16} color={COLORS.blue} />
+                <Text style={{ color: COLORS.blue, fontSize: 15, fontWeight: '700' }}>Reset votes</Text>
+              </Pressable>
+            </View>
+          )}
+
           {/* Question */}
           <View style={{
             backgroundColor: COLORS.surface,
@@ -613,46 +753,25 @@ export default function PollEditScreen() {
             </Text>
           </Pressable>
 
-          {/* Editing-only actions */}
+          {/* Delete (edit mode only — reset votes moved to Results Summary above) */}
           {isEditing && (
-            <>
-              <Pressable
-                onPress={handleResetVotes}
-                style={{
-                  backgroundColor: COLORS.surface,
-                  borderRadius: 18,
-                  paddingVertical: 16,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexDirection: 'row',
-                  gap: 10,
-                  marginBottom: 12,
-                  borderWidth: 2,
-                  borderColor: COLORS.blue,
-                }}
-              >
-                <RotateCcw size={18} color={COLORS.blue} />
-                <Text style={{ color: COLORS.blue, fontSize: 16, fontWeight: '700' }}>Reset votes</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={handleDelete}
-                style={{
-                  backgroundColor: COLORS.dangerLight,
-                  borderRadius: 18,
-                  paddingVertical: 16,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexDirection: 'row',
-                  gap: 10,
-                  borderWidth: 2,
-                  borderColor: COLORS.danger,
-                }}
-              >
-                <Trash2 size={18} color={COLORS.danger} />
-                <Text style={{ color: COLORS.danger, fontSize: 16, fontWeight: '700' }}>Delete poll</Text>
-              </Pressable>
-            </>
+            <Pressable
+              onPress={handleDelete}
+              style={{
+                backgroundColor: COLORS.dangerLight,
+                borderRadius: 18,
+                paddingVertical: 16,
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row',
+                gap: 10,
+                borderWidth: 2,
+                borderColor: COLORS.danger,
+              }}
+            >
+              <Trash2 size={18} color={COLORS.danger} />
+              <Text style={{ color: COLORS.danger, fontSize: 16, fontWeight: '700' }}>Delete poll</Text>
+            </Pressable>
           )}
         </ScrollView>
       </Animated.View>

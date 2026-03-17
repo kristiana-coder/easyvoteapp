@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
+import { DonutChart } from '@/components/DonutChart';
 
 const BASE_URL = 'https://at52tm8me4yfm63sgxb9tx3u2csxcjqs.app.specular.dev';
 
@@ -57,18 +58,25 @@ function ResultBar({
   index: number;
 }) {
   const { width } = useWindowDimensions();
-  const barWidth = useRef(new Animated.Value(0)).current;
+  const barAnim = useRef(new Animated.Value(0)).current;
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-  const maxBarWidth = width - 40 - 32; // screen padding + card padding
+  // Available bar width: screen - horizontal padding (40) - card padding (40) - label area (80) - pct badge (70)
+  const maxBarWidth = width - 40 - 40 - 80 - 70;
 
   useEffect(() => {
-    Animated.timing(barWidth, {
-      toValue: (pct / 100) * maxBarWidth,
+    barAnim.setValue(0);
+    Animated.timing(barAnim, {
+      toValue: pct / 100,
       duration: 700,
       delay: index * 150,
       useNativeDriver: false,
     }).start();
-  }, [pct, maxBarWidth]);
+  }, [pct]);
+
+  const animatedWidth = barAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, maxBarWidth],
+  });
 
   const pctDisplay = pct + '%';
   const countDisplay = count.toString();
@@ -78,52 +86,39 @@ function ResultBar({
       backgroundColor: COLORS.surface,
       borderRadius: 20,
       padding: 20,
-      marginBottom: 16,
+      marginBottom: 12,
       boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
       borderWidth: 1,
       borderColor: COLORS.border,
     }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 12 }}>
-        <View style={{
-          width: 56,
-          height: 56,
-          borderRadius: 16,
-          backgroundColor: colorLight,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-          <Text style={{ fontSize: 30 }}>{emoji}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 18, fontWeight: '800', color: COLORS.text }}>{label}</Text>
-          <Text style={{ fontSize: 14, color: COLORS.textSecondary, fontWeight: '600', marginTop: 2 }}>
-            {countDisplay}
-            <Text style={{ color: COLORS.textSecondary }}> votes</Text>
+      {/* Top row: emoji+label | bar | pct */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        {/* Left: emoji + label */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, width: 80 }}>
+          <Text style={{ fontSize: 22 }}>{emoji}</Text>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: COLORS.text, flex: 1 }} numberOfLines={1}>
+            {label}
           </Text>
         </View>
-        <View style={{
-          backgroundColor: colorLight,
-          paddingHorizontal: 14,
-          paddingVertical: 6,
-          borderRadius: 12,
-        }}>
-          <Text style={{ fontSize: 22, fontWeight: '900', color: color }}>{pctDisplay}</Text>
-        </View>
-      </View>
 
-      {/* Bar track */}
-      <View style={{
-        height: 16,
-        backgroundColor: colorLight,
-        borderRadius: 8,
-        overflow: 'hidden',
-      }}>
-        <Animated.View style={{
-          height: '100%',
-          width: barWidth,
-          backgroundColor: color,
-          borderRadius: 8,
-        }} />
+        {/* Middle: bar track */}
+        <View style={{ flex: 1, height: 14, backgroundColor: colorLight, borderRadius: 7, overflow: 'hidden' }}>
+          <Animated.View style={{
+            height: '100%',
+            width: animatedWidth,
+            backgroundColor: color,
+            borderRadius: 7,
+          }} />
+        </View>
+
+        {/* Right: count + pct */}
+        <View style={{ alignItems: 'flex-end', width: 70 }}>
+          <Text style={{ fontSize: 16, fontWeight: '900', color: color }}>{pctDisplay}</Text>
+          <Text style={{ fontSize: 11, fontWeight: '600', color: COLORS.textSecondary, marginTop: 1 }}>
+            {countDisplay}
+            <Text style={{ fontWeight: '400' }}> votes</Text>
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -167,6 +162,7 @@ export default function ResultsScreen() {
     useCallback(() => {
       console.log('[ResultsScreen] Screen focused — starting auto-refresh');
       setLoading(true);
+      contentOpacity.setValue(0);
       fetchResults().finally(() => {
         setLoading(false);
         Animated.timing(contentOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
@@ -200,7 +196,11 @@ export default function ResultsScreen() {
         <Text style={{ fontSize: 22, fontWeight: '800', color: COLORS.text, marginTop: 16, textAlign: 'center' }}>Oops!</Text>
         <Text style={{ fontSize: 16, color: COLORS.textSecondary, marginTop: 8, textAlign: 'center' }}>{error}</Text>
         <Pressable
-          onPress={() => { setLoading(true); fetchResults().finally(() => setLoading(false)); }}
+          onPress={() => {
+            console.log('[ResultsScreen] User pressed retry');
+            setLoading(true);
+            fetchResults().finally(() => setLoading(false));
+          }}
           style={{ marginTop: 24, backgroundColor: COLORS.blue, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 20 }}
         >
           <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>Try again</Text>
@@ -223,6 +223,7 @@ export default function ResultsScreen() {
   const leadingChoice = poll.counts.a > poll.counts.b ? 'a' : poll.counts.b > poll.counts.a ? 'b' : null;
   const leadingEmoji = leadingChoice === 'a' ? poll.option_a_emoji : leadingChoice === 'b' ? poll.option_b_emoji : '🤝';
   const leadingLabel = leadingChoice === 'a' ? poll.option_a_label : leadingChoice === 'b' ? poll.option_b_label : 'Tie!';
+  const leadingText = leadingChoice ? 'Leading' : "It's a tie!";
 
   return (
     <Animated.View style={{ flex: 1, opacity: contentOpacity, backgroundColor: COLORS.background }}>
@@ -261,7 +262,7 @@ export default function ResultsScreen() {
             backgroundColor: COLORS.surface,
             borderRadius: 24,
             padding: 20,
-            marginBottom: 24,
+            marginBottom: 20,
             alignItems: 'center',
             boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
             borderWidth: 1,
@@ -269,7 +270,7 @@ export default function ResultsScreen() {
           }}>
             <Text style={{ fontSize: 48 }}>{leadingEmoji}</Text>
             <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.textSecondary, marginTop: 8 }}>
-              {leadingChoice ? 'Leading' : 'It\'s a tie!'}
+              {leadingText}
             </Text>
             <Text style={{ fontSize: 22, fontWeight: '900', color: COLORS.text, marginTop: 4 }}>
               {leadingLabel}
@@ -296,6 +297,33 @@ export default function ResultsScreen() {
           colorLight={COLORS.blueLight}
           index={1}
         />
+
+        {/* Donut Chart */}
+        <View style={{
+          backgroundColor: COLORS.surface,
+          borderRadius: 24,
+          padding: 24,
+          marginTop: 8,
+          marginBottom: 12,
+          alignItems: 'center',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+          borderWidth: 1,
+          borderColor: COLORS.border,
+        }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: COLORS.textSecondary, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 20 }}>
+            Vote breakdown
+          </Text>
+          <DonutChart
+            valueA={poll.counts.a}
+            valueB={poll.counts.b}
+            labelA={poll.option_a_label}
+            labelB={poll.option_b_label}
+            colorA={COLORS.coral}
+            colorB={COLORS.blue}
+            size={200}
+            strokeWidth={24}
+          />
+        </View>
 
         {/* Total */}
         <View style={{
