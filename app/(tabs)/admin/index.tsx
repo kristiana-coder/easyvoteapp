@@ -10,7 +10,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Plus, Pencil, CheckCircle } from 'lucide-react-native';
+import { Plus, Pencil, CheckCircle, Download } from 'lucide-react-native';
+import { ResultsModal } from '@/components/ResultsModal';
+import type { PollWithCounts } from '@/components/ResultsChart';
 
 const BASE_URL = 'https://at52tm8me4yfm63sgxb9tx3u2csxcjqs.app.specular.dev';
 
@@ -94,7 +96,17 @@ function MiniBarChart({ countA, countB, total }: { countA: number; countB: numbe
   );
 }
 
-function PollCard({ poll, index, onPress }: { poll: Poll; index: number; onPress: () => void }) {
+function PollCard({
+  poll,
+  index,
+  onPress,
+  onDownloadPress,
+}: {
+  poll: Poll;
+  index: number;
+  onPress: () => void;
+  onDownloadPress: () => void;
+}) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(16)).current;
   const scale = useRef(new Animated.Value(1)).current;
@@ -186,15 +198,37 @@ function PollCard({ poll, index, onPress }: { poll: Poll; index: number; onPress
             <MiniBarChart countA={countA} countB={countB} total={countTotal} />
           </View>
 
-          <View style={{
-            width: 36,
-            height: 36,
-            borderRadius: 10,
-            backgroundColor: COLORS.purpleLight,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <Pencil size={16} color={COLORS.purple} />
+          {/* Action buttons column */}
+          <View style={{ gap: 8 }}>
+            {/* Download button */}
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                onDownloadPress();
+              }}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                backgroundColor: '#E0F7F5',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Download size={16} color={COLORS.blue} />
+            </Pressable>
+
+            {/* Edit button */}
+            <View style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              backgroundColor: COLORS.purpleLight,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <Pencil size={16} color={COLORS.purple} />
+            </View>
           </View>
         </View>
       </Pressable>
@@ -209,6 +243,8 @@ export default function AdminScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [modalPoll, setModalPoll] = useState<PollWithCounts | null>(null);
+  const [fetchingPollId, setFetchingPollId] = useState<string | null>(null);
   const contentOpacity = useRef(new Animated.Value(0)).current;
 
   const fetchPolls = useCallback(async () => {
@@ -279,6 +315,38 @@ export default function AdminScreen() {
     console.log('[AdminScreen] User pressed edit poll:', id);
     router.push({ pathname: '/poll-edit', params: { id } });
   };
+
+  const handleDownloadPress = useCallback(async (poll: Poll) => {
+    console.log('[AdminScreen] User pressed download for poll:', poll.id, poll.title);
+    setFetchingPollId(poll.id);
+    try {
+      const res = await fetch(`${BASE_URL}/api/polls/${poll.id}`);
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('[AdminScreen] Error fetching poll for download:', res.status, text);
+        return;
+      }
+      const data = await res.json();
+      console.log('[AdminScreen] Poll data fetched for download:', data.id, 'counts:', data.counts);
+      const pollWithCounts: PollWithCounts = {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        image_url: data.image_url,
+        option_a_label: data.option_a_label,
+        option_b_label: data.option_b_label,
+        option_a_emoji: data.option_a_emoji,
+        option_b_emoji: data.option_b_emoji,
+        is_active: data.is_active,
+        counts: data.counts ?? { a: 0, b: 0, total: 0 },
+      };
+      setModalPoll(pollWithCounts);
+    } catch (e) {
+      console.error('[AdminScreen] Network error fetching poll for download:', e);
+    } finally {
+      setFetchingPollId(null);
+    }
+  }, []);
 
   const activeCount = polls.filter(p => p.is_active).length;
   const totalDisplay = polls.length.toString();
@@ -423,15 +491,40 @@ export default function AdminScreen() {
           </View>
         ) : (
           polls.map((poll, index) => (
-            <PollCard
-              key={poll.id}
-              poll={poll}
-              index={index}
-              onPress={() => handleEditPoll(poll.id)}
-            />
+            <View key={poll.id}>
+              <PollCard
+                poll={poll}
+                index={index}
+                onPress={() => handleEditPoll(poll.id)}
+                onDownloadPress={() => handleDownloadPress(poll)}
+              />
+              {/* Loading overlay for this card while fetching */}
+              {fetchingPollId === poll.id && (
+                <View style={{
+                  position: 'absolute',
+                  top: 0, left: 0, right: 0, bottom: 12,
+                  borderRadius: 20,
+                  backgroundColor: 'rgba(255,255,255,0.75)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <ActivityIndicator size="small" color={COLORS.blue} />
+                </View>
+              )}
+            </View>
           ))
         )}
       </ScrollView>
+
+      {/* Results modal */}
+      <ResultsModal
+        visible={modalPoll !== null}
+        poll={modalPoll}
+        onClose={() => {
+          console.log('[AdminScreen] Results modal closed');
+          setModalPoll(null);
+        }}
+      />
     </Animated.View>
   );
 }

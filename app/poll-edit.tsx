@@ -15,7 +15,9 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { Trash2, RotateCcw, Save, CheckCircle, ImageIcon } from 'lucide-react-native';
+import { Trash2, RotateCcw, Save, CheckCircle, ImageIcon, Download } from 'lucide-react-native';
+import { ResultsModal } from '@/components/ResultsModal';
+import type { PollWithCounts } from '@/components/ResultsChart';
 import * as ImagePicker from 'expo-image-picker';
 import { DonutChart } from '@/components/DonutChart';
 
@@ -196,6 +198,7 @@ export default function PollEditScreen() {
   const [uploading, setUploading] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showResultsModal, setShowResultsModal] = useState(false);
   const contentOpacity = useRef(new Animated.Value(0)).current;
 
   const screenTitle = isEditing ? 'Edit Poll' : 'New Poll';
@@ -508,25 +511,51 @@ export default function PollEditScreen() {
                 />
               </View>
 
-              {/* Reset votes button — lives here near the chart */}
-              <Pressable
-                onPress={handleResetVotes}
-                style={{
-                  marginTop: 16,
-                  backgroundColor: COLORS.surface,
-                  borderRadius: 14,
-                  paddingVertical: 13,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexDirection: 'row',
-                  gap: 8,
-                  borderWidth: 2,
-                  borderColor: COLORS.blue,
-                }}
-              >
-                <RotateCcw size={16} color={COLORS.blue} />
-                <Text style={{ color: COLORS.blue, fontSize: 15, fontWeight: '700' }}>Reset votes</Text>
-              </Pressable>
+              {/* Action buttons row */}
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                {/* Download Chart button */}
+                <Pressable
+                  onPress={() => {
+                    console.log('[PollEdit] User pressed Download Chart for poll:', id);
+                    setShowResultsModal(true);
+                  }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: COLORS.purpleLight,
+                    borderRadius: 14,
+                    paddingVertical: 13,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 8,
+                    borderWidth: 2,
+                    borderColor: COLORS.purple,
+                  }}
+                >
+                  <Download size={16} color={COLORS.purple} />
+                  <Text style={{ color: COLORS.purple, fontSize: 15, fontWeight: '700' }}>Download Chart</Text>
+                </Pressable>
+
+                {/* Reset votes button */}
+                <Pressable
+                  onPress={handleResetVotes}
+                  style={{
+                    flex: 1,
+                    backgroundColor: COLORS.surface,
+                    borderRadius: 14,
+                    paddingVertical: 13,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 8,
+                    borderWidth: 2,
+                    borderColor: COLORS.blue,
+                  }}
+                >
+                  <RotateCcw size={16} color={COLORS.blue} />
+                  <Text style={{ color: COLORS.blue, fontSize: 15, fontWeight: '700' }}>Reset votes</Text>
+                </Pressable>
+              </View>
             </View>
           )}
 
@@ -782,6 +811,29 @@ export default function PollEditScreen() {
           )}
         </ScrollView>
       </Animated.View>
+
+      {/* Results modal for download */}
+      {isEditing && counts !== null && (
+        <ResultsModal
+          visible={showResultsModal}
+          poll={{
+            id: id ?? '',
+            title: form.title,
+            description: form.description || undefined,
+            image_url: form.image_url || undefined,
+            option_a_label: form.option_a_label,
+            option_b_label: form.option_b_label,
+            option_a_emoji: form.option_a_emoji,
+            option_b_emoji: form.option_b_emoji,
+            is_active: form.is_active,
+            counts,
+          }}
+          onClose={() => {
+            console.log('[PollEdit] Results modal closed');
+            setShowResultsModal(false);
+          }}
+        />
+      )}
     </>
   );
 }
