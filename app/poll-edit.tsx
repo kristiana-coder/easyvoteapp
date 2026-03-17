@@ -379,28 +379,35 @@ export default function PollEditScreen() {
     console.log('[PollEdit] Image picked, uploading to', `${BASE_URL}/api/upload`);
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', {
-        uri: asset.uri,
-        type: 'image/jpeg',
-        name: 'photo.jpg',
-      } as any);
-      const res = await fetch(`${BASE_URL}/api/upload`, {
-        method: 'POST',
-        body: formData,
+      const url = await new Promise<string>((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', {
+          uri: asset.uri,
+          type: 'image/jpeg',
+          name: 'photo.jpg',
+        } as any);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${BASE_URL}/api/upload`);
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const data = JSON.parse(xhr.responseText);
+            console.log('[PollEdit] Upload success, url:', data.url);
+            resolve(data.url);
+          } else {
+            console.error('[PollEdit] Upload failed:', xhr.status, xhr.responseText);
+            reject(new Error(`Upload failed: ${xhr.status} ${xhr.responseText}`));
+          }
+        };
+        xhr.onerror = () => {
+          console.error('[PollEdit] Upload network error (XHR)');
+          reject(new Error('Network error during upload'));
+        };
+        xhr.send(formData);
       });
-      if (!res.ok) {
-        const text = await res.text();
-        console.error('[PollEdit] Upload failed:', res.status, text);
-        Alert.alert('Upload failed', 'Could not upload the image. Please try again.');
-        return;
-      }
-      const data = await res.json();
-      console.log('[PollEdit] Upload success, url:', data.url);
-      setField('image_url', data.url);
-    } catch (e) {
-      console.error('[PollEdit] Upload network error:', e);
-      Alert.alert('Upload failed', 'No internet connection.');
+      setField('image_url', url);
+    } catch (e: any) {
+      console.error('[PollEdit] Upload error:', e);
+      Alert.alert('Upload failed', e?.message ?? 'Could not upload the image. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -729,7 +736,7 @@ export default function PollEditScreen() {
           {/* Save button */}
           <Pressable
             onPress={handleSave}
-            disabled={saving}
+            disabled={saving || uploading}
             style={{
               backgroundColor: COLORS.purple,
               borderRadius: 18,
