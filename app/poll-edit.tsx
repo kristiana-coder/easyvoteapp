@@ -379,25 +379,36 @@ export default function PollEditScreen() {
       return;
     }
     const asset = result.assets[0];
-    console.log('[PollEdit] Image picked, uploading to', `${BASE_URL}/api/upload`);
+    const mimeType = asset.mimeType ?? 'image/jpeg';
+    const fileName = asset.fileName ?? ('photo.' + (mimeType.split('/')[1] ?? 'jpg'));
+    console.log('[PollEdit] Image picked — uri:', asset.uri, 'mimeType:', mimeType, 'fileName:', fileName);
+    console.log('[PollEdit] Uploading to', `${BASE_URL}/api/upload`);
     setUploading(true);
     try {
       const url = await new Promise<string>((resolve, reject) => {
         const formData = new FormData();
         formData.append('file', {
           uri: asset.uri,
-          type: 'image/jpeg',
-          name: 'photo.jpg',
+          type: mimeType,
+          name: fileName,
         } as any);
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `${BASE_URL}/api/upload`);
         xhr.onload = () => {
+          console.log('[PollEdit] XHR onload — status:', xhr.status, 'response:', xhr.responseText);
           if (xhr.status >= 200 && xhr.status < 300) {
-            const data = JSON.parse(xhr.responseText);
-            console.log('[PollEdit] Upload success, url:', data.url);
-            resolve(data.url);
+            try {
+              const data = JSON.parse(xhr.responseText);
+              console.log('[PollEdit] Upload success, url:', data.url);
+              resolve(data.url);
+            } catch (parseErr) {
+              console.error('[PollEdit] Failed to parse upload response:', xhr.responseText);
+              Alert.alert('Upload failed', `Unexpected server response:\n${xhr.responseText.slice(0, 200)}`);
+              reject(new Error('Invalid JSON response from upload endpoint'));
+            }
           } else {
             console.error('[PollEdit] Upload failed:', xhr.status, xhr.responseText);
+            Alert.alert('Upload failed', `Server returned ${xhr.status}:\n${xhr.responseText.slice(0, 200)}`);
             reject(new Error(`Upload failed: ${xhr.status} ${xhr.responseText}`));
           }
         };
