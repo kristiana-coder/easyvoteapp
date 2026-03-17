@@ -508,17 +508,17 @@ export default function PollEditScreen() {
                 colorLight={COLORS.blueLight}
               />
 
-              {/* Donut chart */}
+              {/* Column chart */}
               <View style={{ alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
                 <DonutChart
                   valueA={counts.a}
                   valueB={counts.b}
                   labelA={form.option_a_label}
                   labelB={form.option_b_label}
+                  emojiA={form.option_a_emoji}
+                  emojiB={form.option_b_emoji}
                   colorA={COLORS.coral}
                   colorB={COLORS.blue}
-                  size={160}
-                  strokeWidth={18}
                 />
               </View>
 

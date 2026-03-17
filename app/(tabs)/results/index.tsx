@@ -298,7 +298,7 @@ export default function ResultsScreen() {
           index={1}
         />
 
-        {/* Donut Chart */}
+        {/* Column Chart */}
         <View style={{
           backgroundColor: COLORS.surface,
           borderRadius: 24,
@@ -318,10 +318,10 @@ export default function ResultsScreen() {
             valueB={poll.counts.b}
             labelA={poll.option_a_label}
             labelB={poll.option_b_label}
+            emojiA={poll.option_a_emoji}
+            emojiB={poll.option_b_emoji}
             colorA={COLORS.coral}
             colorB={COLORS.blue}
-            size={200}
-            strokeWidth={24}
           />
         </View>
 

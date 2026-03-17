@@ -148,17 +148,17 @@ export function ResultsChart({ poll }: ResultsChartProps) {
         />
       </View>
 
-      {/* Donut chart */}
+      {/* Column chart */}
       <View style={{ alignItems: 'center', marginBottom: 16 }}>
         <DonutChart
           valueA={poll.counts.a}
           valueB={poll.counts.b}
           labelA={poll.option_a_label}
           labelB={poll.option_b_label}
+          emojiA={poll.option_a_emoji}
+          emojiB={poll.option_b_emoji}
           colorA={CORAL}
           colorB={TEAL}
-          size={180}
-          strokeWidth={20}
         />
       </View>
 
