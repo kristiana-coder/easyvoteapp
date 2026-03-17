@@ -3,6 +3,7 @@ import { api, expectStatus, createTestFile } from "./helpers";
 
 describe("API Integration Tests", () => {
   let pollId: string;
+  let fourOptionPollId: string;
 
   test("Create a poll", async () => {
     const res = await api("/api/polls", {
@@ -89,6 +90,29 @@ describe("API Integration Tests", () => {
     await expectStatus(res, 201);
     const data = await res.json();
     expect(data.counts.total).toBe(2);
+  });
+
+  test("Cast vote without required choice field", async () => {
+    const res = await api(`/api/polls/${pollId}/votes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        voter_name: "Charlie",
+      }),
+    });
+    await expectStatus(res, 400);
+  });
+
+  test("Cast vote with invalid choice value", async () => {
+    const res = await api(`/api/polls/${pollId}/votes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        choice: "e",
+        voter_name: "David",
+      }),
+    });
+    await expectStatus(res, 400);
   });
 
   test("Cast vote on nonexistent poll", async () => {
@@ -195,6 +219,58 @@ describe("API Integration Tests", () => {
       }),
     });
     await expectStatus(res, 400);
+  });
+
+  test("Create poll with all four options", async () => {
+    const res = await api("/api/polls", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Four Options Poll",
+        option_a_label: "Option A",
+        option_b_label: "Option B",
+        option_c_label: "Option C",
+        option_d_label: "Option D",
+        option_a_emoji: "🅰️",
+        option_b_emoji: "🅱️",
+        option_c_emoji: "©️",
+        option_d_emoji: "🅳",
+      }),
+    });
+    await expectStatus(res, 201);
+    const data = await res.json();
+    expect(data.id).toBeDefined();
+    expect(data.option_c_label).toBe("Option C");
+    expect(data.option_d_label).toBe("Option D");
+    fourOptionPollId = data.id;
+  });
+
+  test("Vote on option C", async () => {
+    const res = await api(`/api/polls/${fourOptionPollId}/votes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        choice: "c",
+        voter_name: "Eve",
+      }),
+    });
+    await expectStatus(res, 201);
+    const data = await res.json();
+    expect(data.counts.c).toBe(1);
+  });
+
+  test("Vote on option D", async () => {
+    const res = await api(`/api/polls/${fourOptionPollId}/votes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        choice: "d",
+        voter_name: "Frank",
+      }),
+    });
+    await expectStatus(res, 201);
+    const data = await res.json();
+    expect(data.counts.d).toBe(1);
   });
 
   test("Upload a file", async () => {

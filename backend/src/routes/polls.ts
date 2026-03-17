@@ -13,12 +13,18 @@ interface PollWithCounts {
   option_b_label: string;
   option_a_emoji: string;
   option_b_emoji: string;
+  option_c_label: string | null;
+  option_c_emoji: string | null;
+  option_d_label: string | null;
+  option_d_emoji: string | null;
   is_active: boolean;
   created_at: Date;
   updated_at: Date;
   counts: {
     a: number;
     b: number;
+    c: number;
+    d: number;
     total: number;
   };
 }
@@ -35,16 +41,22 @@ async function getVoteCounts(app: App, pollId: string) {
 
   let aCount = 0;
   let bCount = 0;
+  let cCount = 0;
+  let dCount = 0;
 
   for (const result of results) {
     if (result.choice === 'a') aCount = result.count;
     if (result.choice === 'b') bCount = result.count;
+    if (result.choice === 'c') cCount = result.count;
+    if (result.choice === 'd') dCount = result.count;
   }
 
   return {
     a: aCount,
     b: bCount,
-    total: aCount + bCount,
+    c: cCount,
+    d: dCount,
+    total: aCount + bCount + cCount + dCount,
   };
 }
 
@@ -80,6 +92,10 @@ export async function registerPollRoutes(app: App) {
                   option_b_label: { type: 'string' },
                   option_a_emoji: { type: 'string' },
                   option_b_emoji: { type: 'string' },
+                  option_c_label: { type: ['string', 'null'] },
+                  option_c_emoji: { type: ['string', 'null'] },
+                  option_d_label: { type: ['string', 'null'] },
+                  option_d_emoji: { type: ['string', 'null'] },
                   is_active: { type: 'boolean' },
                   created_at: { type: 'string', format: 'date-time' },
                   updated_at: { type: 'string', format: 'date-time' },
@@ -116,6 +132,10 @@ export async function registerPollRoutes(app: App) {
           option_b_label: { type: 'string' },
           option_a_emoji: { type: 'string' },
           option_b_emoji: { type: 'string' },
+          option_c_label: { type: 'string' },
+          option_c_emoji: { type: 'string' },
+          option_d_label: { type: 'string' },
+          option_d_emoji: { type: 'string' },
           is_active: { type: 'boolean' },
         },
       },
@@ -132,6 +152,10 @@ export async function registerPollRoutes(app: App) {
             option_b_label: { type: 'string' },
             option_a_emoji: { type: 'string' },
             option_b_emoji: { type: 'string' },
+            option_c_label: { type: ['string', 'null'] },
+            option_c_emoji: { type: ['string', 'null'] },
+            option_d_label: { type: ['string', 'null'] },
+            option_d_emoji: { type: ['string', 'null'] },
             is_active: { type: 'boolean' },
             created_at: { type: 'string', format: 'date-time' },
             updated_at: { type: 'string', format: 'date-time' },
@@ -149,12 +173,16 @@ export async function registerPollRoutes(app: App) {
         option_b_label?: string;
         option_a_emoji?: string;
         option_b_emoji?: string;
+        option_c_label?: string;
+        option_c_emoji?: string;
+        option_d_label?: string;
+        option_d_emoji?: string;
         is_active?: boolean;
       };
     }>,
     reply: FastifyReply
   ) => {
-    const { title, description, image_url, option_a_label, option_b_label, option_a_emoji, option_b_emoji, is_active } = request.body;
+    const { title, description, image_url, option_a_label, option_b_label, option_a_emoji, option_b_emoji, option_c_label, option_c_emoji, option_d_label, option_d_emoji, is_active } = request.body;
     app.logger.info({ title, is_active }, 'Creating new poll');
 
     // If is_active is true, set all other polls to inactive
@@ -175,6 +203,10 @@ export async function registerPollRoutes(app: App) {
         option_b_label: option_b_label || 'Dislike',
         option_a_emoji: option_a_emoji || '👍',
         option_b_emoji: option_b_emoji || '👎',
+        option_c_label: option_c_label || null,
+        option_c_emoji: option_c_emoji || null,
+        option_d_label: option_d_label || null,
+        option_d_emoji: option_d_emoji || null,
         is_active: is_active !== undefined ? is_active : true,
         created_at: new Date(),
         updated_at: new Date(),
@@ -203,6 +235,10 @@ export async function registerPollRoutes(app: App) {
             option_b_label: { type: 'string' },
             option_a_emoji: { type: 'string' },
             option_b_emoji: { type: 'string' },
+            option_c_label: { type: ['string', 'null'] },
+            option_c_emoji: { type: ['string', 'null'] },
+            option_d_label: { type: ['string', 'null'] },
+            option_d_emoji: { type: ['string', 'null'] },
             is_active: { type: 'boolean' },
             created_at: { type: 'string', format: 'date-time' },
             updated_at: { type: 'string', format: 'date-time' },
@@ -211,6 +247,8 @@ export async function registerPollRoutes(app: App) {
               properties: {
                 a: { type: 'integer' },
                 b: { type: 'integer' },
+                c: { type: 'integer' },
+                d: { type: 'integer' },
                 total: { type: 'integer' },
               },
             },
@@ -269,6 +307,10 @@ export async function registerPollRoutes(app: App) {
             option_b_label: { type: 'string' },
             option_a_emoji: { type: 'string' },
             option_b_emoji: { type: 'string' },
+            option_c_label: { type: ['string', 'null'] },
+            option_c_emoji: { type: ['string', 'null'] },
+            option_d_label: { type: ['string', 'null'] },
+            option_d_emoji: { type: ['string', 'null'] },
             is_active: { type: 'boolean' },
             created_at: { type: 'string', format: 'date-time' },
             updated_at: { type: 'string', format: 'date-time' },
@@ -277,6 +319,8 @@ export async function registerPollRoutes(app: App) {
               properties: {
                 a: { type: 'integer' },
                 b: { type: 'integer' },
+                c: { type: 'integer' },
+                d: { type: 'integer' },
                 total: { type: 'integer' },
               },
             },
@@ -332,6 +376,10 @@ export async function registerPollRoutes(app: App) {
           option_b_label: { type: 'string' },
           option_a_emoji: { type: 'string' },
           option_b_emoji: { type: 'string' },
+          option_c_label: { type: ['string', 'null'] },
+          option_c_emoji: { type: ['string', 'null'] },
+          option_d_label: { type: ['string', 'null'] },
+          option_d_emoji: { type: ['string', 'null'] },
           is_active: { type: 'boolean' },
         },
       },
@@ -348,6 +396,10 @@ export async function registerPollRoutes(app: App) {
             option_b_label: { type: 'string' },
             option_a_emoji: { type: 'string' },
             option_b_emoji: { type: 'string' },
+            option_c_label: { type: ['string', 'null'] },
+            option_c_emoji: { type: ['string', 'null'] },
+            option_d_label: { type: ['string', 'null'] },
+            option_d_emoji: { type: ['string', 'null'] },
             is_active: { type: 'boolean' },
             created_at: { type: 'string', format: 'date-time' },
             updated_at: { type: 'string', format: 'date-time' },
@@ -366,13 +418,17 @@ export async function registerPollRoutes(app: App) {
         option_b_label?: string;
         option_a_emoji?: string;
         option_b_emoji?: string;
+        option_c_label?: string | null;
+        option_c_emoji?: string | null;
+        option_d_label?: string | null;
+        option_d_emoji?: string | null;
         is_active?: boolean;
       };
     }>,
     reply: FastifyReply
   ) => {
     const { id } = request.params;
-    const { title, description, image_url, option_a_label, option_b_label, option_a_emoji, option_b_emoji, is_active } = request.body;
+    const { title, description, image_url, option_a_label, option_b_label, option_a_emoji, option_b_emoji, option_c_label, option_c_emoji, option_d_label, option_d_emoji, is_active } = request.body;
     app.logger.info({ pollId: id, is_active }, 'Updating poll');
 
     // Check if poll exists
@@ -403,6 +459,10 @@ export async function registerPollRoutes(app: App) {
     if (option_b_label !== undefined) updates.option_b_label = option_b_label;
     if (option_a_emoji !== undefined) updates.option_a_emoji = option_a_emoji;
     if (option_b_emoji !== undefined) updates.option_b_emoji = option_b_emoji;
+    if (option_c_label !== undefined) updates.option_c_label = option_c_label;
+    if (option_c_emoji !== undefined) updates.option_c_emoji = option_c_emoji;
+    if (option_d_label !== undefined) updates.option_d_label = option_d_label;
+    if (option_d_emoji !== undefined) updates.option_d_emoji = option_d_emoji;
     if (is_active !== undefined) updates.is_active = is_active;
 
     const updated = await app.db
@@ -474,7 +534,7 @@ export async function registerPollRoutes(app: App) {
         type: 'object',
         required: ['choice'],
         properties: {
-          choice: { type: 'string', enum: ['a', 'b'] },
+          choice: { type: 'string', enum: ['a', 'b', 'c', 'd'] },
           voter_name: { type: 'string' },
         },
       },
@@ -489,6 +549,8 @@ export async function registerPollRoutes(app: App) {
               properties: {
                 a: { type: 'integer' },
                 b: { type: 'integer' },
+                c: { type: 'integer' },
+                d: { type: 'integer' },
                 total: { type: 'integer' },
               },
             },
@@ -506,6 +568,12 @@ export async function registerPollRoutes(app: App) {
     const { id } = request.params;
     const { choice, voter_name } = request.body;
     app.logger.info({ pollId: id, choice, voterName: voter_name }, 'Inserting vote');
+
+    // Validate choice
+    if (!['a', 'b', 'c', 'd'].includes(choice)) {
+      app.logger.warn({ pollId: id, choice }, 'Invalid choice');
+      return reply.status(400).send({ error: 'Invalid choice' });
+    }
 
     // Check if poll exists
     const poll = await app.db
@@ -688,6 +756,10 @@ export async function seedPolls(app: App) {
       option_b_label: 'Not for me',
       option_a_emoji: '❤️',
       option_b_emoji: '😕',
+      option_c_label: null,
+      option_c_emoji: null,
+      option_d_label: null,
+      option_d_emoji: null,
       is_active: true,
       created_at: new Date(),
       updated_at: new Date(),
@@ -701,6 +773,10 @@ export async function seedPolls(app: App) {
       option_b_label: 'Not really',
       option_a_emoji: '🐾',
       option_b_emoji: '😐',
+      option_c_label: null,
+      option_c_emoji: null,
+      option_d_label: null,
+      option_d_emoji: null,
       is_active: false,
       created_at: new Date(),
       updated_at: new Date(),
@@ -714,6 +790,10 @@ export async function seedPolls(app: App) {
       option_b_label: 'No thanks',
       option_a_emoji: '😋',
       option_b_emoji: '🙅',
+      option_c_label: null,
+      option_c_emoji: null,
+      option_d_label: null,
+      option_d_emoji: null,
       is_active: false,
       created_at: new Date(),
       updated_at: new Date(),
