@@ -148,6 +148,31 @@ describe("API Integration Tests", () => {
     await expectStatus(res, 404);
   });
 
+  test("Update a nonexistent poll", async () => {
+    const res = await api("/api/polls/00000000-0000-0000-0000-000000000000", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Updated Title",
+      }),
+    });
+    await expectStatus(res, 404);
+  });
+
+  test("Reset votes on a nonexistent poll", async () => {
+    const res = await api("/api/polls/00000000-0000-0000-0000-000000000000/reset", {
+      method: "POST",
+    });
+    await expectStatus(res, 404);
+  });
+
+  test("Delete a nonexistent poll", async () => {
+    const res = await api("/api/polls/00000000-0000-0000-0000-000000000000", {
+      method: "DELETE",
+    });
+    await expectStatus(res, 404);
+  });
+
   test("Create poll with minimum required fields", async () => {
     const res = await api("/api/polls", {
       method: "POST",

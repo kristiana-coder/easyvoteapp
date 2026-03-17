@@ -375,6 +375,18 @@ export async function registerPollRoutes(app: App) {
     const { title, description, image_url, option_a_label, option_b_label, option_a_emoji, option_b_emoji, is_active } = request.body;
     app.logger.info({ pollId: id, is_active }, 'Updating poll');
 
+    // Check if poll exists
+    const poll = await app.db
+      .select()
+      .from(schema.polls)
+      .where(eq(schema.polls.id, id))
+      .limit(1);
+
+    if (poll.length === 0) {
+      app.logger.warn({ pollId: id }, 'Poll not found');
+      return reply.status(404).send({ error: 'Poll not found' });
+    }
+
     // If is_active is being set to true, set all other polls to inactive
     if (is_active === true) {
       await app.db
@@ -428,6 +440,19 @@ export async function registerPollRoutes(app: App) {
   }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const { id } = request.params;
     app.logger.info({ pollId: id }, 'Deleting poll');
+
+    // Check if poll exists
+    const poll = await app.db
+      .select()
+      .from(schema.polls)
+      .where(eq(schema.polls.id, id))
+      .limit(1);
+
+    if (poll.length === 0) {
+      app.logger.warn({ pollId: id }, 'Poll not found');
+      return reply.status(404).send({ error: 'Poll not found' });
+    }
+
     await app.db.delete(schema.polls).where(eq(schema.polls.id, id));
     app.logger.info({ pollId: id }, 'Poll deleted successfully');
     return { success: true };
@@ -531,6 +556,19 @@ export async function registerPollRoutes(app: App) {
   }, async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const { id } = request.params;
     app.logger.info({ pollId: id }, 'Resetting poll votes');
+
+    // Check if poll exists
+    const poll = await app.db
+      .select()
+      .from(schema.polls)
+      .where(eq(schema.polls.id, id))
+      .limit(1);
+
+    if (poll.length === 0) {
+      app.logger.warn({ pollId: id }, 'Poll not found');
+      return reply.status(404).send({ error: 'Poll not found' });
+    }
+
     await app.db.delete(schema.votes).where(eq(schema.votes.poll_id, id));
     app.logger.info({ pollId: id }, 'Poll votes reset successfully');
     return { success: true };
