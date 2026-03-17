@@ -599,6 +599,7 @@ export async function registerPollRoutes(app: App) {
           type: 'object',
           properties: {
             error: { type: 'string' },
+            details: { type: 'string' },
           },
         },
       },
@@ -610,8 +611,9 @@ export async function registerPollRoutes(app: App) {
     try {
       data = await request.file({ limits: { fileSize: 10 * 1024 * 1024 } });
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
       app.logger.error({ err: error }, 'Error reading file from request');
-      return reply.status(500).send({ error: 'Upload failed' });
+      return reply.status(500).send({ error: 'Upload failed', details: errorMsg });
     }
 
     if (!data) {
@@ -624,8 +626,9 @@ export async function registerPollRoutes(app: App) {
       try {
         buffer = await data.toBuffer();
       } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
         app.logger.error({ err: error }, 'File too large');
-        return reply.status(500).send({ error: 'Upload failed' });
+        return reply.status(500).send({ error: 'Upload failed', details: errorMsg });
       }
 
       // Generate unique filename: UUID + original extension
@@ -658,8 +661,9 @@ export async function registerPollRoutes(app: App) {
       app.logger.info({ filename, url }, 'File uploaded successfully');
       return { url };
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
       app.logger.error({ err: error }, 'Failed to upload file');
-      return reply.status(500).send({ error: 'Upload failed' });
+      return reply.status(500).send({ error: 'Upload failed', details: errorMsg });
     }
   });
 }
