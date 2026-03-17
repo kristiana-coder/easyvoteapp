@@ -181,7 +181,7 @@ export default function VoteScreen() {
         <Text style={{ fontSize: 22, fontWeight: '800', color: COLORS.text, marginTop: 16, textAlign: 'center' }}>Oops!</Text>
         <Text style={{ fontSize: 16, color: COLORS.textSecondary, marginTop: 8, textAlign: 'center' }}>{error}</Text>
         <Pressable
-          onPress={() => { setLoading(true); fetchActivePoll().finally(() => setLoading(false)); }}
+          onPress={() => { console.log('[VoteScreen] Retry button pressed'); setLoading(true); fetchActivePoll().finally(() => setLoading(false)); }}
           style={{ marginTop: 24, backgroundColor: COLORS.coral, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 20 }}
         >
           <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>Try again</Text>
@@ -200,7 +200,8 @@ export default function VoteScreen() {
     );
   }
 
-  const hasImage = poll.image_url && poll.image_url.startsWith('http');
+  const hasImage = !!(poll.image_url && poll.image_url.startsWith('http'));
+  const titleMarginTop = hasImage ? 20 : 8;
 
   return (
     <Animated.View style={{ flex: 1, opacity: contentOpacity, backgroundColor: COLORS.background }}>
@@ -209,27 +210,48 @@ export default function VoteScreen() {
         contentContainerStyle={{
           paddingTop: insets.top + 16,
           paddingBottom: insets.bottom + 120,
-          paddingHorizontal: 20,
           alignItems: 'center',
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={{ alignItems: 'center', marginBottom: 8 }}>
+        {/* Header label */}
+        <View style={{ alignItems: 'center', marginBottom: 8, paddingHorizontal: 20 }}>
           <Text style={{ fontSize: 15, fontWeight: '700', color: COLORS.coral, letterSpacing: 2, textTransform: 'uppercase' }}>
             🗳️ Time to Vote!
           </Text>
         </View>
 
+        {/* Photo — full-width, above the question */}
+        {hasImage ? (
+          <View style={{
+            width: '100%',
+            height: 240,
+            marginTop: 4,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.14,
+            shadowRadius: 12,
+            elevation: 6,
+          }}>
+            <Image
+              source={resolveImageSource(poll.image_url)}
+              style={{ width: '100%', height: '100%', borderRadius: 20 }}
+              contentFit="cover"
+            />
+          </View>
+        ) : null}
+
         {/* Poll Title */}
         <Text style={{
-          fontSize: 34,
-          fontWeight: '900',
+          fontSize: 30,
+          fontWeight: '800',
           color: COLORS.text,
           textAlign: 'center',
           letterSpacing: -0.5,
-          lineHeight: 42,
-          marginBottom: 12,
+          lineHeight: 38,
+          marginTop: titleMarginTop,
+          marginBottom: 10,
+          paddingHorizontal: 20,
         }}>
           {poll.title}
         </Text>
@@ -241,114 +263,98 @@ export default function VoteScreen() {
             color: COLORS.textSecondary,
             textAlign: 'center',
             lineHeight: 24,
-            marginBottom: 16,
-            paddingHorizontal: 8,
+            marginBottom: 20,
+            paddingHorizontal: 28,
           }}>
             {poll.description}
           </Text>
-        ) : null}
-
-        {/* Image */}
-        {hasImage ? (
-          <View style={{
-            width: '100%',
-            height: 200,
-            borderRadius: 24,
-            overflow: 'hidden',
-            marginBottom: 24,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
-          }}>
-            <Image
-              source={resolveImageSource(poll.image_url)}
-              style={{ width: '100%', height: '100%' }}
-              contentFit="cover"
-            />
-          </View>
         ) : (
-          <View style={{ height: 16 }} />
+          <View style={{ height: 20 }} />
         )}
 
         {/* Vote Buttons */}
-        <View style={{ flexDirection: 'row', gap: 16, width: '100%' }}>
-          {/* Button A */}
-          <Animated.View style={{ flex: 1, transform: [{ scale: buttonAScale }] }}>
-            <Pressable
-              onPress={() => handleVote('a')}
-              disabled={voting}
-              style={{
-                minHeight: 160,
-                borderRadius: 24,
-                backgroundColor: COLORS.coralLight,
-                borderWidth: 3,
-                borderColor: voted === 'a' ? COLORS.coral : 'transparent',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 20,
-                opacity: voting && voted !== 'a' ? 0.5 : 1,
-                boxShadow: '0 6px 24px rgba(255,107,107,0.25)',
-              }}
-            >
-              <Animated.Text style={{
-                fontSize: 60,
-                transform: [{ scale: voted === 'a' ? chosenEmojiScale : 1 }],
-              }}>
-                {poll.option_a_emoji}
-              </Animated.Text>
-              <Text style={{
-                fontSize: 18,
-                fontWeight: '800',
-                color: COLORS.coral,
-                marginTop: 12,
-                textAlign: 'center',
-              }}>
-                {poll.option_a_label}
-              </Text>
-            </Pressable>
-          </Animated.View>
+        <View style={{ paddingHorizontal: 20, width: '100%' }}>
+          <View style={{ flexDirection: 'row', gap: 16, width: '100%' }}>
+            {/* Button A */}
+            <Animated.View style={{ flex: 1, transform: [{ scale: buttonAScale }] }}>
+              <Pressable
+                onPress={() => handleVote('a')}
+                disabled={voting}
+                style={{
+                  minHeight: 160,
+                  borderRadius: 24,
+                  backgroundColor: COLORS.coralLight,
+                  borderWidth: 3,
+                  borderColor: voted === 'a' ? COLORS.coral : 'transparent',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 20,
+                  opacity: voting && voted !== 'a' ? 0.5 : 1,
+                  boxShadow: '0 6px 24px rgba(255,107,107,0.25)',
+                }}
+              >
+                <Animated.Text style={{
+                  fontSize: 60,
+                  transform: [{ scale: voted === 'a' ? chosenEmojiScale : 1 }],
+                }}>
+                  {poll.option_a_emoji}
+                </Animated.Text>
+                <Text style={{
+                  fontSize: 18,
+                  fontWeight: '800',
+                  color: COLORS.coral,
+                  marginTop: 12,
+                  textAlign: 'center',
+                }}>
+                  {poll.option_a_label}
+                </Text>
+              </Pressable>
+            </Animated.View>
 
-          {/* Button B */}
-          <Animated.View style={{ flex: 1, transform: [{ scale: buttonBScale }] }}>
-            <Pressable
-              onPress={() => handleVote('b')}
-              disabled={voting}
-              style={{
-                minHeight: 160,
-                borderRadius: 24,
-                backgroundColor: COLORS.blueLight,
-                borderWidth: 3,
-                borderColor: voted === 'b' ? COLORS.blue : 'transparent',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 20,
-                opacity: voting && voted !== 'b' ? 0.5 : 1,
-                boxShadow: '0 6px 24px rgba(78,205,196,0.25)',
-              }}
-            >
-              <Animated.Text style={{
-                fontSize: 60,
-                transform: [{ scale: voted === 'b' ? chosenEmojiScale : 1 }],
-              }}>
-                {poll.option_b_emoji}
-              </Animated.Text>
-              <Text style={{
-                fontSize: 18,
-                fontWeight: '800',
-                color: COLORS.blue,
-                marginTop: 12,
-                textAlign: 'center',
-              }}>
-                {poll.option_b_label}
-              </Text>
-            </Pressable>
-          </Animated.View>
+            {/* Button B */}
+            <Animated.View style={{ flex: 1, transform: [{ scale: buttonBScale }] }}>
+              <Pressable
+                onPress={() => handleVote('b')}
+                disabled={voting}
+                style={{
+                  minHeight: 160,
+                  borderRadius: 24,
+                  backgroundColor: COLORS.blueLight,
+                  borderWidth: 3,
+                  borderColor: voted === 'b' ? COLORS.blue : 'transparent',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 20,
+                  opacity: voting && voted !== 'b' ? 0.5 : 1,
+                  boxShadow: '0 6px 24px rgba(78,205,196,0.25)',
+                }}
+              >
+                <Animated.Text style={{
+                  fontSize: 60,
+                  transform: [{ scale: voted === 'b' ? chosenEmojiScale : 1 }],
+                }}>
+                  {poll.option_b_emoji}
+                </Animated.Text>
+                <Text style={{
+                  fontSize: 18,
+                  fontWeight: '800',
+                  color: COLORS.blue,
+                  marginTop: 12,
+                  textAlign: 'center',
+                }}>
+                  {poll.option_b_label}
+                </Text>
+              </Pressable>
+            </Animated.View>
+          </View>
+
+          {/* Tap hint */}
+          {!voted && !voting && (
+            <Text style={{ marginTop: 20, fontSize: 14, color: COLORS.textSecondary, fontWeight: '600', textAlign: 'center' }}>
+              Tap a button to vote! 👆
+            </Text>
+          )}
         </View>
-
-        {/* Tap hint */}
-        {!voted && !voting && (
-          <Text style={{ marginTop: 20, fontSize: 14, color: COLORS.textSecondary, fontWeight: '600' }}>
-            Tap a button to vote! 👆
-          </Text>
-        )}
       </ScrollView>
 
       {/* Celebration Overlay */}
@@ -376,7 +382,10 @@ export default function VoteScreen() {
           </Text>
           <Text style={{ fontSize: 36, marginTop: 4 }}>🎉</Text>
           <Text style={{ fontSize: 16, color: COLORS.textSecondary, marginTop: 8, fontWeight: '600' }}>
-            You picked {chosenLabel}!
+            You picked
+          </Text>
+          <Text style={{ fontSize: 16, color: COLORS.textSecondary, fontWeight: '700' }}>
+            {chosenLabel}
           </Text>
         </Animated.View>
       </Animated.View>
