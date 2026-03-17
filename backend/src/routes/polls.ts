@@ -96,6 +96,7 @@ export async function registerPollRoutes(app: App) {
                   option_c_emoji: { type: ['string', 'null'] },
                   option_d_label: { type: ['string', 'null'] },
                   option_d_emoji: { type: ['string', 'null'] },
+                  collection_id: { type: ['string', 'null'], format: 'uuid' },
                   is_active: { type: 'boolean' },
                   created_at: { type: 'string', format: 'date-time' },
                   updated_at: { type: 'string', format: 'date-time' },
@@ -380,6 +381,7 @@ export async function registerPollRoutes(app: App) {
           option_c_emoji: { type: ['string', 'null'] },
           option_d_label: { type: ['string', 'null'] },
           option_d_emoji: { type: ['string', 'null'] },
+          collection_id: { type: ['string', 'null'], format: 'uuid' },
           is_active: { type: 'boolean' },
         },
       },
@@ -400,6 +402,7 @@ export async function registerPollRoutes(app: App) {
             option_c_emoji: { type: ['string', 'null'] },
             option_d_label: { type: ['string', 'null'] },
             option_d_emoji: { type: ['string', 'null'] },
+            collection_id: { type: ['string', 'null'], format: 'uuid' },
             is_active: { type: 'boolean' },
             created_at: { type: 'string', format: 'date-time' },
             updated_at: { type: 'string', format: 'date-time' },
@@ -422,13 +425,14 @@ export async function registerPollRoutes(app: App) {
         option_c_emoji?: string | null;
         option_d_label?: string | null;
         option_d_emoji?: string | null;
+        collection_id?: string | null;
         is_active?: boolean;
       };
     }>,
     reply: FastifyReply
   ) => {
     const { id } = request.params;
-    const { title, description, image_url, option_a_label, option_b_label, option_a_emoji, option_b_emoji, option_c_label, option_c_emoji, option_d_label, option_d_emoji, is_active } = request.body;
+    const { title, description, image_url, option_a_label, option_b_label, option_a_emoji, option_b_emoji, option_c_label, option_c_emoji, option_d_label, option_d_emoji, collection_id, is_active } = request.body;
     app.logger.info({ pollId: id, is_active }, 'Updating poll');
 
     // Check if poll exists
@@ -463,6 +467,7 @@ export async function registerPollRoutes(app: App) {
     if (option_c_emoji !== undefined) updates.option_c_emoji = option_c_emoji;
     if (option_d_label !== undefined) updates.option_d_label = option_d_label;
     if (option_d_emoji !== undefined) updates.option_d_emoji = option_d_emoji;
+    if (collection_id !== undefined) updates.collection_id = collection_id || null;
     if (is_active !== undefined) updates.is_active = is_active;
 
     const updated = await app.db

@@ -4,7 +4,128 @@ import { api, expectStatus, createTestFile } from "./helpers";
 describe("API Integration Tests", () => {
   let pollId: string;
   let fourOptionPollId: string;
+  let collectionId: string;
 
+  // Collections Tests
+  test("Create a collection", async () => {
+    const res = await api("/api/collections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Sports Polls",
+        description: "A collection of sports-related polls",
+        color: "#FF0000",
+        emoji: "⚽",
+      }),
+    });
+    await expectStatus(res, 201);
+    const data = await res.json();
+    expect(data.id).toBeDefined();
+    expect(data.name).toBe("Sports Polls");
+    expect(data.description).toBe("A collection of sports-related polls");
+    expect(data.color).toBe("#FF0000");
+    expect(data.emoji).toBe("⚽");
+    collectionId = data.id;
+  });
+
+  test("List all collections", async () => {
+    const res = await api("/api/collections");
+    await expectStatus(res, 200);
+    const data = await res.json();
+    expect(data.collections).toBeDefined();
+    expect(Array.isArray(data.collections)).toBe(true);
+  });
+
+  test("Get collection by ID", async () => {
+    const res = await api(`/api/collections/${collectionId}`);
+    await expectStatus(res, 200);
+    const data = await res.json();
+    expect(data.id).toBe(collectionId);
+    expect(data.name).toBe("Sports Polls");
+  });
+
+  test("Get collection by nonexistent ID", async () => {
+    const res = await api("/api/collections/00000000-0000-0000-0000-000000000000");
+    await expectStatus(res, 404);
+  });
+
+  test("Update a collection", async () => {
+    const res = await api(`/api/collections/${collectionId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Sports Polls Updated",
+        color: "#0000FF",
+        emoji: "🏆",
+      }),
+    });
+    await expectStatus(res, 200);
+    const data = await res.json();
+    expect(data.id).toBe(collectionId);
+    expect(data.name).toBe("Sports Polls Updated");
+    expect(data.color).toBe("#0000FF");
+    expect(data.emoji).toBe("🏆");
+  });
+
+  test("Update a nonexistent collection", async () => {
+    const res = await api("/api/collections/00000000-0000-0000-0000-000000000000", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Updated Name",
+      }),
+    });
+    await expectStatus(res, 404);
+  });
+
+  test("Create collection with minimum required fields", async () => {
+    const res = await api("/api/collections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Minimal Collection",
+      }),
+    });
+    await expectStatus(res, 201);
+    const data = await res.json();
+    expect(data.id).toBeDefined();
+    expect(data.name).toBe("Minimal Collection");
+  });
+
+  test("Create collection without required name field", async () => {
+    const res = await api("/api/collections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        description: "Missing name",
+        color: "#FF0000",
+      }),
+    });
+    await expectStatus(res, 400);
+  });
+
+  test("Delete a collection", async () => {
+    const res = await api(`/api/collections/${collectionId}`, {
+      method: "DELETE",
+    });
+    await expectStatus(res, 200);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+  });
+
+  test("Verify collection is deleted", async () => {
+    const res = await api(`/api/collections/${collectionId}`);
+    await expectStatus(res, 404);
+  });
+
+  test("Delete a nonexistent collection", async () => {
+    const res = await api("/api/collections/00000000-0000-0000-0000-000000000000", {
+      method: "DELETE",
+    });
+    await expectStatus(res, 404);
+  });
+
+  // Polls Tests
   test("Create a poll", async () => {
     const res = await api("/api/polls", {
       method: "POST",
