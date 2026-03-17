@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { api, expectStatus } from "./helpers";
+import { api, expectStatus, createTestFile } from "./helpers";
 
 describe("API Integration Tests", () => {
   let pollId: string;
@@ -91,6 +91,18 @@ describe("API Integration Tests", () => {
     expect(data.counts.total).toBe(2);
   });
 
+  test("Cast vote on nonexistent poll", async () => {
+    const res = await api("/api/polls/00000000-0000-0000-0000-000000000000/votes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        choice: "a",
+        voter_name: "Charlie",
+      }),
+    });
+    await expectStatus(res, 404);
+  });
+
   test("Update a poll", async () => {
     const res = await api(`/api/polls/${pollId}`, {
       method: "PUT",
@@ -147,5 +159,37 @@ describe("API Integration Tests", () => {
     await expectStatus(res, 201);
     const data = await res.json();
     expect(data.id).toBeDefined();
+  });
+
+  test("Create poll without required title field", async () => {
+    const res = await api("/api/polls", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        description: "No title provided",
+      }),
+    });
+    await expectStatus(res, 400);
+  });
+
+  test("Upload a file", async () => {
+    const form = new FormData();
+    form.append("file", createTestFile());
+    const res = await api("/api/upload", {
+      method: "POST",
+      body: form,
+    });
+    await expectStatus(res, 200);
+    const data = await res.json();
+    expect(data.url).toBeDefined();
+  });
+
+  test("Upload without file", async () => {
+    const form = new FormData();
+    const res = await api("/api/upload", {
+      method: "POST",
+      body: form,
+    });
+    await expectStatus(res, 400);
   });
 });

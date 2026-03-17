@@ -4,6 +4,7 @@ import { registerPollRoutes, seedPolls } from './routes/polls.js';
 
 // Create application with schema for full database type support
 export const app = await createApplication(schema);
+app.withStorage();
 
 // Export App type for use in route files
 export type App = typeof app;

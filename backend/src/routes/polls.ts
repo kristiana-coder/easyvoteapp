@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { App } from '../index.js';
 import { eq, and, desc, count as dbCount } from 'drizzle-orm';
 import * as schema from '../db/schema/schema.js';
+import { randomUUID } from 'crypto';
 
 interface PollWithCounts {
   id: string;
@@ -481,6 +482,18 @@ export async function registerPollRoutes(app: App) {
     const { choice, voter_name } = request.body;
     app.logger.info({ pollId: id, choice, voterName: voter_name }, 'Inserting vote');
 
+    // Check if poll exists
+    const poll = await app.db
+      .select()
+      .from(schema.polls)
+      .where(eq(schema.polls.id, id))
+      .limit(1);
+
+    if (poll.length === 0) {
+      app.logger.warn({ pollId: id }, 'Poll not found');
+      return reply.status(404).send({ error: 'Poll not found' });
+    }
+
     await app.db.insert(schema.votes).values({
       poll_id: id,
       choice,
@@ -521,6 +534,95 @@ export async function registerPollRoutes(app: App) {
     await app.db.delete(schema.votes).where(eq(schema.votes.poll_id, id));
     app.logger.info({ pollId: id }, 'Poll votes reset successfully');
     return { success: true };
+  });
+
+  // POST /api/upload - file upload endpoint
+  app.fastify.post('/api/upload', {
+    schema: {
+      description: 'Upload a file',
+      tags: ['upload'],
+      response: {
+        200: {
+          description: 'File uploaded successfully',
+          type: 'object',
+          properties: {
+            url: { type: 'string' },
+          },
+        },
+        400: {
+          description: 'Bad request',
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
+          },
+        },
+        500: {
+          description: 'Server error',
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
+          },
+        },
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    app.logger.info({}, 'Starting file upload');
+
+    let data;
+    try {
+      data = await request.file({ limits: { fileSize: 10 * 1024 * 1024 } });
+    } catch (error) {
+      app.logger.error({ err: error }, 'Error reading file from request');
+      return reply.status(500).send({ error: 'Upload failed' });
+    }
+
+    if (!data) {
+      app.logger.warn({}, 'No file uploaded');
+      return reply.status(400).send({ error: 'No file uploaded' });
+    }
+
+    try {
+      let buffer: Buffer;
+      try {
+        buffer = await data.toBuffer();
+      } catch (error) {
+        app.logger.error({ err: error }, 'File too large');
+        return reply.status(500).send({ error: 'Upload failed' });
+      }
+
+      // Generate unique filename: UUID + original extension
+      const uuid = randomUUID();
+      const originalFilename = data.filename || '';
+      let extension = '';
+
+      if (originalFilename) {
+        const lastDotIndex = originalFilename.lastIndexOf('.');
+        if (lastDotIndex > 0) {
+          extension = originalFilename.substring(lastDotIndex);
+        }
+      }
+
+      if (!extension) {
+        extension = '.bin';
+      }
+
+      const filename = `${uuid}${extension}`;
+      const key = `uploads/${filename}`;
+
+      app.logger.info({ filename, keyPath: key }, 'Uploading file to storage');
+
+      // Upload to S3
+      const uploadedKey = await app.storage.upload(key, buffer);
+
+      // Get signed URL
+      const { url } = await app.storage.getSignedUrl(uploadedKey);
+
+      app.logger.info({ filename, url }, 'File uploaded successfully');
+      return { url };
+    } catch (error) {
+      app.logger.error({ err: error }, 'Failed to upload file');
+      return reply.status(500).send({ error: 'Upload failed' });
+    }
   });
 }
 
