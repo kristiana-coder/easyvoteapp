@@ -98,6 +98,22 @@ export default function RootLayout() {
                     presentation: 'card',
                   }}
                 />
+                <Stack.Screen
+                  name="collection-detail"
+                  options={{
+                    headerShown: true,
+                    title: '',
+                    headerBackButtonDisplayMode: 'minimal',
+                  }}
+                />
+                <Stack.Screen
+                  name="collection-edit"
+                  options={{
+                    headerShown: true,
+                    title: 'Folder',
+                    headerBackButtonDisplayMode: 'minimal',
+                  }}
+                />
               </Stack>
               <SystemBars style={"auto"} />
               </GestureHandlerRootView>
