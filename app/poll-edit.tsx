@@ -9,12 +9,14 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
+  StyleSheet,
   ImageSourcePropType,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { Trash2, RotateCcw, Save, CheckCircle } from 'lucide-react-native';
+import { Trash2, RotateCcw, Save, CheckCircle, ImageIcon } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 
 const BASE_URL = 'https://at52tm8me4yfm63sgxb9tx3u2csxcjqs.app.specular.dev';
 
@@ -124,6 +126,8 @@ export default function PollEditScreen() {
   });
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const contentOpacity = useRef(new Animated.Value(0)).current;
 
@@ -283,6 +287,59 @@ export default function PollEditScreen() {
     );
   }, [id, router]);
 
+  const handlePickImage = useCallback(async () => {
+    console.log('[PollEdit] User tapped image picker');
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission denied', 'Please allow access to your photo library in Settings.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images',
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+    if (result.canceled) {
+      console.log('[PollEdit] Image picker cancelled');
+      return;
+    }
+    const asset = result.assets[0];
+    console.log('[PollEdit] Image picked, uploading to', `${BASE_URL}/api/upload`);
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', {
+        uri: asset.uri,
+        type: 'image/jpeg',
+        name: 'photo.jpg',
+      } as any);
+      const res = await fetch(`${BASE_URL}/api/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        console.error('[PollEdit] Upload failed:', res.status, text);
+        Alert.alert('Upload failed', 'Could not upload the image. Please try again.');
+        return;
+      }
+      const data = await res.json();
+      console.log('[PollEdit] Upload success, url:', data.url);
+      setField('image_url', data.url);
+    } catch (e) {
+      console.error('[PollEdit] Upload network error:', e);
+      Alert.alert('Upload failed', 'No internet connection.');
+    } finally {
+      setUploading(false);
+    }
+  }, [setField]);
+
+  const handleRemoveImage = useCallback(() => {
+    console.log('[PollEdit] User removed image');
+    setField('image_url', '');
+  }, [setField]);
+
   const hasImagePreview = form.image_url.startsWith('http');
 
   if (loading) {
@@ -353,21 +410,89 @@ export default function PollEditScreen() {
               placeholder="Add more context for the kids..."
               multiline
             />
-            <FormField
-              label="Image URL (optional)"
-              value={form.image_url}
-              onChangeText={v => setField('image_url', v)}
-              placeholder="https://..."
-              keyboardType="url"
-            />
-            {hasImagePreview && (
-              <View style={{ borderRadius: 14, overflow: 'hidden', height: 140, marginTop: 4 }}>
-                <Image
-                  source={resolveImageSource(form.image_url)}
-                  style={{ width: '100%', height: '100%' }}
-                  contentFit="cover"
-                />
-              </View>
+            {/* Image Picker */}
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: COLORS.textSecondary, marginBottom: 6, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                Photo (optional)
+              </Text>
+              <Pressable onPress={handlePickImage} style={{ position: 'relative' }}>
+                {hasImagePreview ? (
+                  <View style={{ borderRadius: 16, overflow: 'hidden', height: 200, width: '100%' }}>
+                    <Image
+                      source={resolveImageSource(form.image_url)}
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="cover"
+                    />
+                    {uploading && (
+                      <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' }}>
+                        <ActivityIndicator size="large" color="#FFF" />
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  <View style={{
+                    height: 200,
+                    width: '100%',
+                    borderRadius: 16,
+                    backgroundColor: COLORS.inputBg,
+                    borderWidth: 2,
+                    borderColor: COLORS.border,
+                    borderStyle: 'dashed',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: 10,
+                  }}>
+                    {uploading ? (
+                      <ActivityIndicator size="large" color={COLORS.purple} />
+                    ) : (
+                      <>
+                        <ImageIcon size={36} color={COLORS.textTertiary} />
+                        <Text style={{ fontSize: 15, color: COLORS.textTertiary, fontWeight: '600' }}>Tap to add photo</Text>
+                      </>
+                    )}
+                  </View>
+                )}
+              </Pressable>
+              {hasImagePreview && (
+                <Pressable
+                  onPress={handleRemoveImage}
+                  style={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: 'rgba(0,0,0,0.55)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: '#FFF', fontSize: 18, lineHeight: 20, fontWeight: '700' }}>×</Text>
+                </Pressable>
+              )}
+            </View>
+
+            {/* Secondary: manual URL entry */}
+            <Pressable
+              onPress={() => {
+                console.log('[PollEdit] User toggled manual URL input, now:', !showUrlInput);
+                setShowUrlInput(v => !v);
+              }}
+              style={{ marginBottom: showUrlInput ? 8 : 16, alignSelf: 'flex-start' }}
+            >
+              <Text style={{ fontSize: 13, color: COLORS.purple, fontWeight: '600', textDecorationLine: 'underline' }}>
+                {showUrlInput ? 'Hide URL input' : 'Or enter image URL'}
+              </Text>
+            </Pressable>
+            {showUrlInput && (
+              <FormField
+                label="Image URL"
+                value={form.image_url}
+                onChangeText={v => setField('image_url', v)}
+                placeholder="https://..."
+                keyboardType="url"
+              />
             )}
           </View>
 
