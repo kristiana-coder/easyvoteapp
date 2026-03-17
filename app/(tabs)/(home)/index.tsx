@@ -23,12 +23,21 @@ const COLORS = {
   blueLight: '#E0F7F5',
   purple: '#A855F7',
   purpleLight: '#F3E8FF',
-  yellow: '#FFD93D',
-  yellowLight: '#FFFBE6',
+  amber: '#F59E0B',
+  amberLight: '#FEF3C7',
   text: '#1A1A2E',
   textSecondary: '#6B6B8A',
   border: 'rgba(26,26,46,0.08)',
 };
+
+const OPTION_COLORS = [COLORS.coral, COLORS.blue, COLORS.purple, COLORS.amber];
+const OPTION_COLORS_LIGHT = [COLORS.coralLight, COLORS.blueLight, COLORS.purpleLight, COLORS.amberLight];
+const OPTION_SHADOWS = [
+  'rgba(255,107,107,0.25)',
+  'rgba(78,205,196,0.25)',
+  'rgba(168,85,247,0.25)',
+  'rgba(245,158,11,0.25)',
+];
 
 type Poll = {
   id: string;
@@ -39,13 +48,25 @@ type Poll = {
   option_b_label: string;
   option_a_emoji: string;
   option_b_emoji: string;
+  option_c_label?: string | null;
+  option_c_emoji?: string | null;
+  option_d_label?: string | null;
+  option_d_emoji?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
 };
 
 type PollWithCounts = Poll & {
-  counts: { a: number; b: number; total: number };
+  counts: { a: number; b: number; c: number; d: number; total: number };
+};
+
+type VoteChoice = 'a' | 'b' | 'c' | 'd';
+
+type PollOption = {
+  key: VoteChoice;
+  emoji: string;
+  label: string;
 };
 
 function resolveImageSource(source: string | number | ImageSourcePropType | undefined): ImageSourcePropType {
@@ -54,19 +75,37 @@ function resolveImageSource(source: string | number | ImageSourcePropType | unde
   return source as ImageSourcePropType;
 }
 
+function buildOptions(poll: Poll): PollOption[] {
+  const opts: PollOption[] = [
+    { key: 'a', emoji: poll.option_a_emoji, label: poll.option_a_label },
+    { key: 'b', emoji: poll.option_b_emoji, label: poll.option_b_label },
+  ];
+  if (poll.option_c_label) {
+    opts.push({ key: 'c', emoji: poll.option_c_emoji ?? '😐', label: poll.option_c_label });
+  }
+  if (poll.option_d_label) {
+    opts.push({ key: 'd', emoji: poll.option_d_emoji ?? '🤔', label: poll.option_d_label });
+  }
+  return opts;
+}
+
 export default function VoteScreen() {
   const insets = useSafeAreaInsets();
   const [poll, setPoll] = useState<PollWithCounts | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [voted, setVoted] = useState<'a' | 'b' | null>(null);
+  const [voted, setVoted] = useState<VoteChoice | null>(null);
   const [voting, setVoting] = useState(false);
 
   const celebrationScale = useRef(new Animated.Value(0)).current;
   const celebrationOpacity = useRef(new Animated.Value(0)).current;
   const chosenEmojiScale = useRef(new Animated.Value(1)).current;
-  const buttonAScale = useRef(new Animated.Value(1)).current;
-  const buttonBScale = useRef(new Animated.Value(1)).current;
+  const buttonScales = useRef<Record<string, Animated.Value>>({
+    a: new Animated.Value(1),
+    b: new Animated.Value(1),
+    c: new Animated.Value(1),
+    d: new Animated.Value(1),
+  }).current;
   const contentOpacity = useRef(new Animated.Value(0)).current;
 
   const fetchActivePoll = useCallback(async () => {
@@ -103,7 +142,7 @@ export default function VoteScreen() {
     });
   }, [fetchActivePoll]);
 
-  const handleVote = useCallback(async (choice: 'a' | 'b') => {
+  const handleVote = useCallback(async (choice: VoteChoice) => {
     if (!poll || voting) return;
     console.log('[VoteScreen] User pressed vote button:', choice, 'for poll:', poll.id);
 
@@ -115,7 +154,7 @@ export default function VoteScreen() {
     }
 
     setVoting(true);
-    const btnScale = choice === 'a' ? buttonAScale : buttonBScale;
+    const btnScale = buttonScales[choice];
 
     Animated.sequence([
       Animated.spring(btnScale, { toValue: 0.92, useNativeDriver: true, speed: 50, bounciness: 4 }),
@@ -160,10 +199,7 @@ export default function VoteScreen() {
       console.error('[VoteScreen] Vote network error:', e);
       setVoting(false);
     }
-  }, [poll, voting, buttonAScale, buttonBScale, chosenEmojiScale, celebrationOpacity, celebrationScale]);
-
-  const chosenEmoji = voted === 'a' ? poll?.option_a_emoji : poll?.option_b_emoji;
-  const chosenLabel = voted === 'a' ? poll?.option_a_label : poll?.option_b_label;
+  }, [poll, voting, buttonScales, chosenEmojiScale, celebrationOpacity, celebrationScale]);
 
   if (loading) {
     return (
@@ -181,7 +217,11 @@ export default function VoteScreen() {
         <Text style={{ fontSize: 22, fontWeight: '800', color: COLORS.text, marginTop: 16, textAlign: 'center' }}>Oops!</Text>
         <Text style={{ fontSize: 16, color: COLORS.textSecondary, marginTop: 8, textAlign: 'center' }}>{error}</Text>
         <Pressable
-          onPress={() => { console.log('[VoteScreen] Retry button pressed'); setLoading(true); fetchActivePoll().finally(() => setLoading(false)); }}
+          onPress={() => {
+            console.log('[VoteScreen] Retry button pressed');
+            setLoading(true);
+            fetchActivePoll().finally(() => setLoading(false));
+          }}
           style={{ marginTop: 24, backgroundColor: COLORS.coral, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 20 }}
         >
           <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>Try again</Text>
@@ -202,6 +242,25 @@ export default function VoteScreen() {
 
   const hasImage = !!(poll.image_url && poll.image_url.startsWith('http'));
   const titleMarginTop = hasImage ? 20 : 8;
+  const options = buildOptions(poll);
+  const optionCount = options.length;
+
+  // Determine chosen emoji/label for celebration
+  const chosenOption = voted ? options.find(o => o.key === voted) : null;
+  const chosenEmoji = chosenOption?.emoji ?? '';
+  const chosenLabel = chosenOption?.label ?? '';
+
+  // Layout: 2 = row, 3 = first two row + third full, 4 = 2x2 grid
+  const rows: PollOption[][] = [];
+  if (optionCount <= 2) {
+    rows.push(options);
+  } else if (optionCount === 3) {
+    rows.push([options[0], options[1]]);
+    rows.push([options[2]]);
+  } else {
+    rows.push([options[0], options[1]]);
+    rows.push([options[2], options[3]]);
+  }
 
   return (
     <Animated.View style={{ flex: 1, opacity: contentOpacity, backgroundColor: COLORS.background }}>
@@ -221,7 +280,7 @@ export default function VoteScreen() {
           </Text>
         </View>
 
-        {/* Photo — full-width, above the question */}
+        {/* Photo */}
         {hasImage ? (
           <View style={{
             width: '100%',
@@ -273,84 +332,60 @@ export default function VoteScreen() {
         )}
 
         {/* Vote Buttons */}
-        <View style={{ paddingHorizontal: 20, width: '100%' }}>
-          <View style={{ flexDirection: 'row', gap: 16, width: '100%' }}>
-            {/* Button A */}
-            <Animated.View style={{ flex: 1, transform: [{ scale: buttonAScale }] }}>
-              <Pressable
-                onPress={() => handleVote('a')}
-                disabled={voting}
-                style={{
-                  minHeight: 160,
-                  borderRadius: 24,
-                  backgroundColor: COLORS.coralLight,
-                  borderWidth: 3,
-                  borderColor: voted === 'a' ? COLORS.coral : 'transparent',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: 20,
-                  opacity: voting && voted !== 'a' ? 0.5 : 1,
-                  boxShadow: '0 6px 24px rgba(255,107,107,0.25)',
-                }}
-              >
-                <Animated.Text style={{
-                  fontSize: 60,
-                  transform: [{ scale: voted === 'a' ? chosenEmojiScale : 1 }],
-                }}>
-                  {poll.option_a_emoji}
-                </Animated.Text>
-                <Text style={{
-                  fontSize: 18,
-                  fontWeight: '800',
-                  color: COLORS.coral,
-                  marginTop: 12,
-                  textAlign: 'center',
-                }}>
-                  {poll.option_a_label}
-                </Text>
-              </Pressable>
-            </Animated.View>
+        <View style={{ paddingHorizontal: 20, width: '100%', gap: 16 }}>
+          {rows.map((row, rowIdx) => (
+            <View key={rowIdx} style={{ flexDirection: 'row', gap: 16, width: '100%' }}>
+              {row.map((opt) => {
+                const globalIdx = options.findIndex(o => o.key === opt.key);
+                const color = OPTION_COLORS[globalIdx] ?? COLORS.purple;
+                const colorLight = OPTION_COLORS_LIGHT[globalIdx] ?? COLORS.purpleLight;
+                const shadowColor = OPTION_SHADOWS[globalIdx] ?? 'rgba(168,85,247,0.25)';
+                const isVoted = voted === opt.key;
+                const isOther = voting && voted !== null && voted !== opt.key;
 
-            {/* Button B */}
-            <Animated.View style={{ flex: 1, transform: [{ scale: buttonBScale }] }}>
-              <Pressable
-                onPress={() => handleVote('b')}
-                disabled={voting}
-                style={{
-                  minHeight: 160,
-                  borderRadius: 24,
-                  backgroundColor: COLORS.blueLight,
-                  borderWidth: 3,
-                  borderColor: voted === 'b' ? COLORS.blue : 'transparent',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: 20,
-                  opacity: voting && voted !== 'b' ? 0.5 : 1,
-                  boxShadow: '0 6px 24px rgba(78,205,196,0.25)',
-                }}
-              >
-                <Animated.Text style={{
-                  fontSize: 60,
-                  transform: [{ scale: voted === 'b' ? chosenEmojiScale : 1 }],
-                }}>
-                  {poll.option_b_emoji}
-                </Animated.Text>
-                <Text style={{
-                  fontSize: 18,
-                  fontWeight: '800',
-                  color: COLORS.blue,
-                  marginTop: 12,
-                  textAlign: 'center',
-                }}>
-                  {poll.option_b_label}
-                </Text>
-              </Pressable>
-            </Animated.View>
-          </View>
+                return (
+                  <Animated.View key={opt.key} style={{ flex: 1, transform: [{ scale: buttonScales[opt.key] }] }}>
+                    <Pressable
+                      onPress={() => handleVote(opt.key)}
+                      disabled={voting}
+                      style={{
+                        minHeight: 160,
+                        borderRadius: 24,
+                        backgroundColor: colorLight,
+                        borderWidth: 3,
+                        borderColor: isVoted ? color : 'transparent',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 20,
+                        opacity: isOther ? 0.5 : 1,
+                        boxShadow: `0 6px 24px ${shadowColor}`,
+                      }}
+                    >
+                      <Animated.Text style={{
+                        fontSize: 60,
+                        transform: [{ scale: isVoted ? chosenEmojiScale : 1 }],
+                      }}>
+                        {opt.emoji}
+                      </Animated.Text>
+                      <Text style={{
+                        fontSize: 18,
+                        fontWeight: '800',
+                        color: color,
+                        marginTop: 12,
+                        textAlign: 'center',
+                      }}>
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  </Animated.View>
+                );
+              })}
+            </View>
+          ))}
 
           {/* Tap hint */}
           {!voted && !voting && (
-            <Text style={{ marginTop: 20, fontSize: 14, color: COLORS.textSecondary, fontWeight: '600', textAlign: 'center' }}>
+            <Text style={{ marginTop: 4, fontSize: 14, color: COLORS.textSecondary, fontWeight: '600', textAlign: 'center' }}>
               Tap a button to vote! 👆
             </Text>
           )}

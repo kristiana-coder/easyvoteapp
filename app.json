@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "build-an-app-where-t",
-    "slug": "build-an-app-where-t",
+    "name": "Vote App",
+    "slug": "vote-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon-mdl.png",
@@ -35,7 +35,7 @@
       "expo-web-browser",
       "expo-secure-store"
     ],
-    "scheme": "buildanappwheret",
+    "scheme": "voteapp",
     "experiments": {
       "typedRoutes": true
     },

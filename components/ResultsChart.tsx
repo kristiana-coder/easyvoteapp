@@ -12,14 +12,16 @@ export type PollWithCounts = {
   option_b_label: string;
   option_a_emoji: string;
   option_b_emoji: string;
+  option_c_label?: string | null;
+  option_c_emoji?: string | null;
+  option_d_label?: string | null;
+  option_d_emoji?: string | null;
   is_active: boolean;
-  counts: { a: number; b: number; total: number };
+  counts: { a: number; b: number; c: number; d: number; total: number };
 };
 
-const CORAL = '#FF6B6B';
-const TEAL = '#4ECDC4';
-const CORAL_LIGHT = '#FFE8E8';
-const TEAL_LIGHT = '#E0F7F5';
+const OPTION_COLORS = ['#FF6B6B', '#4ECDC4', '#A855F7', '#F59E0B'];
+const OPTION_COLORS_LIGHT = ['#FFE8E8', '#E0F7F5', '#F3E8FF', '#FEF3C7'];
 
 function resolveImageSource(source: string | number | ImageSourcePropType | undefined): ImageSourcePropType {
   if (!source) return { uri: '' };
@@ -78,6 +80,21 @@ export function ResultsChart({ poll }: ResultsChartProps) {
   const totalDisplay = poll.counts.total.toString();
   const totalLabel = poll.counts.total === 1 ? 'total vote' : 'total votes';
 
+  const activeOptions = [
+    { key: 'a', emoji: poll.option_a_emoji, label: poll.option_a_label, count: poll.counts.a },
+    { key: 'b', emoji: poll.option_b_emoji, label: poll.option_b_label, count: poll.counts.b },
+    ...(poll.option_c_label ? [{ key: 'c', emoji: poll.option_c_emoji ?? '😐', label: poll.option_c_label, count: poll.counts.c }] : []),
+    ...(poll.option_d_label ? [{ key: 'd', emoji: poll.option_d_emoji ?? '🤔', label: poll.option_d_label, count: poll.counts.d }] : []),
+  ];
+
+  const chartOptions = activeOptions.map((opt, i) => ({
+    key: opt.key,
+    value: opt.count,
+    label: opt.label,
+    emoji: opt.emoji,
+    color: OPTION_COLORS[i] ?? '#A855F7',
+  }));
+
   return (
     <View style={{
       backgroundColor: '#FFFFFF',
@@ -130,36 +147,22 @@ export function ResultsChart({ poll }: ResultsChartProps) {
         padding: 16,
         marginBottom: 20,
       }}>
-        <HorizontalBar
-          emoji={poll.option_a_emoji}
-          label={poll.option_a_label}
-          count={poll.counts.a}
-          total={poll.counts.total}
-          color={CORAL}
-          colorLight={CORAL_LIGHT}
-        />
-        <HorizontalBar
-          emoji={poll.option_b_emoji}
-          label={poll.option_b_label}
-          count={poll.counts.b}
-          total={poll.counts.total}
-          color={TEAL}
-          colorLight={TEAL_LIGHT}
-        />
+        {activeOptions.map((opt, i) => (
+          <HorizontalBar
+            key={opt.key}
+            emoji={opt.emoji}
+            label={opt.label}
+            count={opt.count}
+            total={poll.counts.total}
+            color={OPTION_COLORS[i] ?? '#A855F7'}
+            colorLight={OPTION_COLORS_LIGHT[i] ?? '#F3E8FF'}
+          />
+        ))}
       </View>
 
       {/* Column chart */}
       <View style={{ alignItems: 'center', marginBottom: 16 }}>
-        <DonutChart
-          valueA={poll.counts.a}
-          valueB={poll.counts.b}
-          labelA={poll.option_a_label}
-          labelB={poll.option_b_label}
-          emojiA={poll.option_a_emoji}
-          emojiB={poll.option_b_emoji}
-          colorA={CORAL}
-          colorB={TEAL}
-        />
+        <DonutChart options={chartOptions} total={poll.counts.total} />
       </View>
 
       {/* Total votes footer */}

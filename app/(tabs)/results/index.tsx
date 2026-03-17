@@ -11,7 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Download } from 'lucide-react-native';
-import { DonutChart } from '@/components/DonutChart';
+import { DonutChart, BarOption } from '@/components/DonutChart';
 import { ResultsModal } from '@/components/ResultsModal';
 
 const BASE_URL = 'https://at52tm8me4yfm63sgxb9tx3u2csxcjqs.app.specular.dev';
@@ -24,11 +24,16 @@ const COLORS = {
   blue: '#4ECDC4',
   blueLight: '#E0F7F5',
   purple: '#A855F7',
-  yellow: '#FFD93D',
+  purpleLight: '#F3E8FF',
+  amber: '#F59E0B',
+  amberLight: '#FEF3C7',
   text: '#1A1A2E',
   textSecondary: '#6B6B8A',
   border: 'rgba(26,26,46,0.08)',
 };
+
+const OPTION_COLORS = [COLORS.coral, COLORS.blue, COLORS.purple, COLORS.amber];
+const OPTION_COLORS_LIGHT = [COLORS.coralLight, COLORS.blueLight, COLORS.purpleLight, COLORS.amberLight];
 
 type PollWithCounts = {
   id: string;
@@ -38,8 +43,12 @@ type PollWithCounts = {
   option_b_label: string;
   option_a_emoji: string;
   option_b_emoji: string;
+  option_c_label?: string | null;
+  option_c_emoji?: string | null;
+  option_d_label?: string | null;
+  option_d_emoji?: string | null;
   is_active: boolean;
-  counts: { a: number; b: number; total: number };
+  counts: { a: number; b: number; c: number; d: number; total: number };
 };
 
 function ResultBar({
@@ -62,7 +71,6 @@ function ResultBar({
   const { width } = useWindowDimensions();
   const barAnim = useRef(new Animated.Value(0)).current;
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-  // Available bar width: screen - horizontal padding (40) - card padding (40) - label area (80) - pct badge (70)
   const maxBarWidth = width - 40 - 40 - 80 - 70;
 
   useEffect(() => {
@@ -93,9 +101,7 @@ function ResultBar({
       borderWidth: 1,
       borderColor: COLORS.border,
     }}>
-      {/* Top row: emoji+label | bar | pct */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        {/* Left: emoji + label */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, width: 80 }}>
           <Text style={{ fontSize: 22 }}>{emoji}</Text>
           <Text style={{ fontSize: 13, fontWeight: '700', color: COLORS.text, flex: 1 }} numberOfLines={1}>
@@ -103,7 +109,6 @@ function ResultBar({
           </Text>
         </View>
 
-        {/* Middle: bar track */}
         <View style={{ flex: 1, height: 14, backgroundColor: colorLight, borderRadius: 7, overflow: 'hidden' }}>
           <Animated.View style={{
             height: '100%',
@@ -113,7 +118,6 @@ function ResultBar({
           }} />
         </View>
 
-        {/* Right: count + pct */}
         <View style={{ alignItems: 'flex-end', width: 70 }}>
           <Text style={{ fontSize: 16, fontWeight: '900', color: color }}>{pctDisplay}</Text>
           <Text style={{ fontSize: 11, fontWeight: '600', color: COLORS.textSecondary, marginTop: 1 }}>
@@ -222,11 +226,40 @@ export default function ResultsScreen() {
     );
   }
 
+  const activeOptions = [
+    { key: 'a', emoji: poll.option_a_emoji, label: poll.option_a_label, count: poll.counts.a },
+    { key: 'b', emoji: poll.option_b_emoji, label: poll.option_b_label, count: poll.counts.b },
+    ...(poll.option_c_label ? [{ key: 'c', emoji: poll.option_c_emoji ?? '😐', label: poll.option_c_label, count: poll.counts.c }] : []),
+    ...(poll.option_d_label ? [{ key: 'd', emoji: poll.option_d_emoji ?? '🤔', label: poll.option_d_label, count: poll.counts.d }] : []),
+  ];
+
+  const chartOptions: BarOption[] = activeOptions.map((opt, i) => ({
+    key: opt.key,
+    value: opt.count,
+    label: opt.label,
+    emoji: opt.emoji,
+    color: OPTION_COLORS[i] ?? COLORS.purple,
+  }));
+
+  // Leading: option with highest count
+  let leadingIdx = 0;
+  let leadingCount = activeOptions[0]?.count ?? 0;
+  let isTie = false;
+  for (let i = 1; i < activeOptions.length; i++) {
+    if (activeOptions[i].count > leadingCount) {
+      leadingCount = activeOptions[i].count;
+      leadingIdx = i;
+      isTie = false;
+    } else if (activeOptions[i].count === leadingCount) {
+      isTie = true;
+    }
+  }
+  const leadingOption = activeOptions[leadingIdx];
+  const leadingEmoji = isTie ? '🤝' : (leadingOption?.emoji ?? '🤝');
+  const leadingLabel = isTie ? 'Tie!' : (leadingOption?.label ?? 'Tie!');
+  const leadingText = isTie ? "It's a tie!" : 'Leading';
+
   const totalDisplay = poll.counts.total.toString();
-  const leadingChoice = poll.counts.a > poll.counts.b ? 'a' : poll.counts.b > poll.counts.a ? 'b' : null;
-  const leadingEmoji = leadingChoice === 'a' ? poll.option_a_emoji : leadingChoice === 'b' ? poll.option_b_emoji : '🤝';
-  const leadingLabel = leadingChoice === 'a' ? poll.option_a_label : leadingChoice === 'b' ? poll.option_b_label : 'Tie!';
-  const leadingText = leadingChoice ? 'Leading' : "It's a tie!";
 
   return (
     <Animated.View style={{ flex: 1, opacity: contentOpacity, backgroundColor: COLORS.background }}>
@@ -282,24 +315,18 @@ export default function ResultsScreen() {
         )}
 
         {/* Result Bars */}
-        <ResultBar
-          emoji={poll.option_a_emoji}
-          label={poll.option_a_label}
-          count={poll.counts.a}
-          total={poll.counts.total}
-          color={COLORS.coral}
-          colorLight={COLORS.coralLight}
-          index={0}
-        />
-        <ResultBar
-          emoji={poll.option_b_emoji}
-          label={poll.option_b_label}
-          count={poll.counts.b}
-          total={poll.counts.total}
-          color={COLORS.blue}
-          colorLight={COLORS.blueLight}
-          index={1}
-        />
+        {activeOptions.map((opt, i) => (
+          <ResultBar
+            key={opt.key}
+            emoji={opt.emoji}
+            label={opt.label}
+            count={opt.count}
+            total={poll.counts.total}
+            color={OPTION_COLORS[i] ?? COLORS.purple}
+            colorLight={OPTION_COLORS_LIGHT[i] ?? COLORS.purpleLight}
+            index={i}
+          />
+        ))}
 
         {/* Column Chart */}
         <View style={{
@@ -316,16 +343,7 @@ export default function ResultsScreen() {
           <Text style={{ fontSize: 13, fontWeight: '700', color: COLORS.textSecondary, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 20 }}>
             Vote breakdown
           </Text>
-          <DonutChart
-            valueA={poll.counts.a}
-            valueB={poll.counts.b}
-            labelA={poll.option_a_label}
-            labelB={poll.option_b_label}
-            emojiA={poll.option_a_emoji}
-            emojiB={poll.option_b_emoji}
-            colorA={COLORS.coral}
-            colorB={COLORS.blue}
-          />
+          <DonutChart options={chartOptions} total={poll.counts.total} />
         </View>
 
         {/* Total — tappable to open download modal */}

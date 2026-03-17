@@ -19,7 +19,7 @@ import { Trash2, RotateCcw, Save, CheckCircle, ImageIcon, Download } from 'lucid
 import { ResultsModal } from '@/components/ResultsModal';
 import type { PollWithCounts } from '@/components/ResultsChart';
 import * as ImagePicker from 'expo-image-picker';
-import { DonutChart } from '@/components/DonutChart';
+import { DonutChart, BarOption } from '@/components/DonutChart';
 
 const BASE_URL = 'https://at52tm8me4yfm63sgxb9tx3u2csxcjqs.app.specular.dev';
 
@@ -32,6 +32,8 @@ const COLORS = {
   coralLight: '#FFE8E8',
   blue: '#4ECDC4',
   blueLight: '#E0F7F5',
+  amber: '#F59E0B',
+  amberLight: '#FEF3C7',
   green: '#22C55E',
   greenLight: '#DCFCE7',
   danger: '#EF4444',
@@ -43,6 +45,10 @@ const COLORS = {
   inputBg: '#F5F0FF',
 };
 
+const OPTION_COLORS = [COLORS.coral, COLORS.blue, COLORS.purple, COLORS.amber];
+const OPTION_COLORS_LIGHT = [COLORS.coralLight, COLORS.blueLight, COLORS.purpleLight, COLORS.amberLight];
+const OPTION_LABELS = ['A', 'B', 'C', 'D'];
+
 type PollForm = {
   title: string;
   description: string;
@@ -51,10 +57,14 @@ type PollForm = {
   option_a_emoji: string;
   option_b_label: string;
   option_b_emoji: string;
+  option_c_label: string;
+  option_c_emoji: string;
+  option_d_label: string;
+  option_d_emoji: string;
   is_active: boolean;
 };
 
-type Counts = { a: number; b: number; total: number };
+type Counts = { a: number; b: number; c: number; d: number; total: number };
 
 function resolveImageSource(source: string | number | ImageSourcePropType | undefined): ImageSourcePropType {
   if (!source) return { uri: '' };
@@ -146,7 +156,6 @@ function CompactResultBar({
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-      {/* Left: emoji + label */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, width: 90 }}>
         <Text style={{ fontSize: 18 }}>{emoji}</Text>
         <Text style={{ fontSize: 12, fontWeight: '700', color: COLORS.text, flex: 1 }} numberOfLines={1}>
@@ -154,7 +163,6 @@ function CompactResultBar({
         </Text>
       </View>
 
-      {/* Bar */}
       <View style={{ flex: 1, height: 10, backgroundColor: colorLight, borderRadius: 5, overflow: 'hidden' }}>
         <Animated.View style={{
           height: '100%',
@@ -164,7 +172,6 @@ function CompactResultBar({
         }} />
       </View>
 
-      {/* Right: pct + count */}
       <View style={{ alignItems: 'flex-end', width: 64 }}>
         <Text style={{ fontSize: 14, fontWeight: '800', color }}>{pctDisplay}</Text>
         <Text style={{ fontSize: 10, color: COLORS.textSecondary, fontWeight: '600' }}>
@@ -190,8 +197,17 @@ export default function PollEditScreen() {
     option_a_emoji: '👍',
     option_b_label: 'Dislike',
     option_b_emoji: '👎',
+    option_c_label: '',
+    option_c_emoji: '',
+    option_d_label: '',
+    option_d_emoji: '',
     is_active: false,
   });
+
+  // Track which optional options are active (C and D)
+  const [showC, setShowC] = useState(false);
+  const [showD, setShowD] = useState(false);
+
   const [counts, setCounts] = useState<Counts | null>(null);
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
@@ -234,8 +250,14 @@ export default function PollEditScreen() {
           option_a_emoji: data.option_a_emoji ?? '👍',
           option_b_label: data.option_b_label ?? 'Dislike',
           option_b_emoji: data.option_b_emoji ?? '👎',
+          option_c_label: data.option_c_label ?? '',
+          option_c_emoji: data.option_c_emoji ?? '',
+          option_d_label: data.option_d_label ?? '',
+          option_d_emoji: data.option_d_emoji ?? '',
           is_active: data.is_active ?? false,
         });
+        if (data.option_c_label) setShowC(true);
+        if (data.option_d_label) setShowD(true);
         if (data.counts) {
           setCounts(data.counts);
         }
@@ -250,6 +272,31 @@ export default function PollEditScreen() {
       });
   }, [id, isEditing]);
 
+  const handleAddOption = useCallback(() => {
+    if (!showC) {
+      console.log('[PollEdit] User added Option C');
+      setShowC(true);
+      setForm(prev => ({ ...prev, option_c_label: 'Maybe', option_c_emoji: '😐' }));
+    } else if (!showD) {
+      console.log('[PollEdit] User added Option D');
+      setShowD(true);
+      setForm(prev => ({ ...prev, option_d_label: 'Not sure', option_d_emoji: '🤔' }));
+    }
+  }, [showC, showD]);
+
+  const handleRemoveC = useCallback(() => {
+    console.log('[PollEdit] User removed Option C');
+    setShowC(false);
+    setShowD(false);
+    setForm(prev => ({ ...prev, option_c_label: '', option_c_emoji: '', option_d_label: '', option_d_emoji: '' }));
+  }, []);
+
+  const handleRemoveD = useCallback(() => {
+    console.log('[PollEdit] User removed Option D');
+    setShowD(false);
+    setForm(prev => ({ ...prev, option_d_label: '', option_d_emoji: '' }));
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (!form.title.trim()) {
       Alert.alert('Missing question', 'Please enter a question for the poll.');
@@ -257,7 +304,7 @@ export default function PollEditScreen() {
     }
     console.log('[PollEdit] User pressed save. isEditing:', isEditing, 'id:', id);
     setSaving(true);
-    const body = {
+    const body: Record<string, unknown> = {
       title: form.title.trim(),
       description: form.description.trim() || undefined,
       image_url: form.image_url.trim() || undefined,
@@ -267,6 +314,22 @@ export default function PollEditScreen() {
       option_b_emoji: form.option_b_emoji.trim() || '👎',
       is_active: form.is_active,
     };
+
+    if (showC && form.option_c_label.trim()) {
+      body.option_c_label = form.option_c_label.trim();
+      body.option_c_emoji = form.option_c_emoji.trim() || '😐';
+    } else {
+      body.option_c_label = null;
+      body.option_c_emoji = null;
+    }
+
+    if (showD && form.option_d_label.trim()) {
+      body.option_d_label = form.option_d_label.trim();
+      body.option_d_emoji = form.option_d_emoji.trim() || '🤔';
+    } else {
+      body.option_d_label = null;
+      body.option_d_emoji = null;
+    }
 
     try {
       const url = isEditing ? `${BASE_URL}/api/polls/${id}` : `${BASE_URL}/api/polls`;
@@ -292,7 +355,7 @@ export default function PollEditScreen() {
       Alert.alert('Save failed', 'No internet connection.');
       setSaving(false);
     }
-  }, [form, id, isEditing, router]);
+  }, [form, id, isEditing, router, showC, showD]);
 
   const handleResetVotes = useCallback(() => {
     console.log('[PollEdit] User pressed reset votes for poll:', id);
@@ -316,7 +379,7 @@ export default function PollEditScreen() {
               }
               const data = await res.json();
               console.log('[PollEdit] Reset success:', data);
-              setCounts({ a: 0, b: 0, total: 0 });
+              setCounts({ a: 0, b: 0, c: 0, d: 0, total: 0 });
               Alert.alert('Done!', 'Votes have been reset.');
             } catch (e) {
               console.error('[PollEdit] Reset network error:', e);
@@ -433,6 +496,23 @@ export default function PollEditScreen() {
   }, [setField]);
 
   const hasImagePreview = form.image_url.startsWith('http');
+  const canAddOption = !showC || !showD;
+
+  // Build active options for results summary
+  const activeResultOptions = counts ? [
+    { key: 'a', emoji: form.option_a_emoji, label: form.option_a_label, count: counts.a, color: COLORS.coral, colorLight: COLORS.coralLight },
+    { key: 'b', emoji: form.option_b_emoji, label: form.option_b_label, count: counts.b, color: COLORS.blue, colorLight: COLORS.blueLight },
+    ...(showC && form.option_c_label ? [{ key: 'c', emoji: form.option_c_emoji || '😐', label: form.option_c_label, count: counts.c, color: COLORS.purple, colorLight: COLORS.purpleLight }] : []),
+    ...(showD && form.option_d_label ? [{ key: 'd', emoji: form.option_d_emoji || '🤔', label: form.option_d_label, count: counts.d, color: COLORS.amber, colorLight: COLORS.amberLight }] : []),
+  ] : [];
+
+  const chartOptions: BarOption[] = activeResultOptions.map(opt => ({
+    key: opt.key,
+    value: opt.count,
+    label: opt.label,
+    emoji: opt.emoji,
+    color: opt.color,
+  }));
 
   if (loading) {
     return (
@@ -490,41 +570,24 @@ export default function PollEditScreen() {
                 📊 Results Summary
               </Text>
 
-              {/* Compact bar chart */}
-              <CompactResultBar
-                emoji={form.option_a_emoji}
-                label={form.option_a_label}
-                count={counts.a}
-                total={counts.total}
-                color={COLORS.coral}
-                colorLight={COLORS.coralLight}
-              />
-              <CompactResultBar
-                emoji={form.option_b_emoji}
-                label={form.option_b_label}
-                count={counts.b}
-                total={counts.total}
-                color={COLORS.blue}
-                colorLight={COLORS.blueLight}
-              />
-
-              {/* Column chart */}
-              <View style={{ alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
-                <DonutChart
-                  valueA={counts.a}
-                  valueB={counts.b}
-                  labelA={form.option_a_label}
-                  labelB={form.option_b_label}
-                  emojiA={form.option_a_emoji}
-                  emojiB={form.option_b_emoji}
-                  colorA={COLORS.coral}
-                  colorB={COLORS.blue}
+              {activeResultOptions.map(opt => (
+                <CompactResultBar
+                  key={opt.key}
+                  emoji={opt.emoji}
+                  label={opt.label}
+                  count={opt.count}
+                  total={counts.total}
+                  color={opt.color}
+                  colorLight={opt.colorLight}
                 />
+              ))}
+
+              <View style={{ alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
+                <DonutChart options={chartOptions} total={counts.total} />
               </View>
 
               {/* Action buttons row */}
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-                {/* Download Chart button */}
                 <Pressable
                   onPress={() => {
                     console.log('[PollEdit] User pressed Download Chart for poll:', id);
@@ -547,7 +610,6 @@ export default function PollEditScreen() {
                   <Text style={{ color: COLORS.purple, fontSize: 15, fontWeight: '700' }}>Download Chart</Text>
                 </Pressable>
 
-                {/* Reset votes button */}
                 <Pressable
                   onPress={handleResetVotes}
                   style={{
@@ -683,61 +745,98 @@ export default function PollEditScreen() {
             )}
           </View>
 
-          {/* Options */}
-          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+          {/* ── Answer Options ── */}
+          <View style={{
+            backgroundColor: COLORS.surface,
+            borderRadius: 20,
+            padding: 20,
+            marginBottom: 16,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+            borderWidth: 1,
+            borderColor: COLORS.border,
+          }}>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.purple, marginBottom: 4, letterSpacing: 1, textTransform: 'uppercase' }}>
+              🎯 Answer Options
+            </Text>
+            <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginBottom: 16, fontWeight: '500' }}>
+              Tap the emoji to change it
+            </Text>
+
             {/* Option A */}
-            <View style={{
-              flex: 1,
-              backgroundColor: COLORS.coralLight,
-              borderRadius: 20,
-              padding: 16,
-              borderWidth: 1,
-              borderColor: 'rgba(255,107,107,0.2)',
-            }}>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.coral, marginBottom: 12, letterSpacing: 1, textTransform: 'uppercase' }}>
-                Option A
-              </Text>
-              <FormField
-                label="Label"
-                value={form.option_a_label}
-                onChangeText={v => setField('option_a_label', v)}
-                placeholder="Like"
-              />
-              <FormField
-                label="Emoji"
-                value={form.option_a_emoji}
-                onChangeText={v => setField('option_a_emoji', v)}
-                placeholder="👍"
-                maxLength={2}
-              />
-            </View>
+            <OptionRow
+              letter="A"
+              color={COLORS.coral}
+              colorLight={COLORS.coralLight}
+              emoji={form.option_a_emoji}
+              label={form.option_a_label}
+              onEmojiChange={v => setField('option_a_emoji', v)}
+              onLabelChange={v => setField('option_a_label', v)}
+              canRemove={false}
+            />
 
             {/* Option B */}
-            <View style={{
-              flex: 1,
-              backgroundColor: COLORS.blueLight,
-              borderRadius: 20,
-              padding: 16,
-              borderWidth: 1,
-              borderColor: 'rgba(78,205,196,0.2)',
-            }}>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.blue, marginBottom: 12, letterSpacing: 1, textTransform: 'uppercase' }}>
-                Option B
-              </Text>
-              <FormField
-                label="Label"
-                value={form.option_b_label}
-                onChangeText={v => setField('option_b_label', v)}
-                placeholder="Dislike"
+            <OptionRow
+              letter="B"
+              color={COLORS.blue}
+              colorLight={COLORS.blueLight}
+              emoji={form.option_b_emoji}
+              label={form.option_b_label}
+              onEmojiChange={v => setField('option_b_emoji', v)}
+              onLabelChange={v => setField('option_b_label', v)}
+              canRemove={false}
+            />
+
+            {/* Option C */}
+            {showC && (
+              <OptionRow
+                letter="C"
+                color={COLORS.purple}
+                colorLight={COLORS.purpleLight}
+                emoji={form.option_c_emoji}
+                label={form.option_c_label}
+                onEmojiChange={v => setField('option_c_emoji', v)}
+                onLabelChange={v => setField('option_c_label', v)}
+                canRemove
+                onRemove={handleRemoveC}
               />
-              <FormField
-                label="Emoji"
-                value={form.option_b_emoji}
-                onChangeText={v => setField('option_b_emoji', v)}
-                placeholder="👎"
-                maxLength={2}
+            )}
+
+            {/* Option D */}
+            {showD && (
+              <OptionRow
+                letter="D"
+                color={COLORS.amber}
+                colorLight={COLORS.amberLight}
+                emoji={form.option_d_emoji}
+                label={form.option_d_label}
+                onEmojiChange={v => setField('option_d_emoji', v)}
+                onLabelChange={v => setField('option_d_label', v)}
+                canRemove
+                onRemove={handleRemoveD}
               />
-            </View>
+            )}
+
+            {/* Add option button */}
+            {canAddOption && (
+              <Pressable
+                onPress={handleAddOption}
+                style={({ pressed }) => ({
+                  marginTop: 8,
+                  borderRadius: 14,
+                  borderWidth: 2,
+                  borderColor: COLORS.purple,
+                  borderStyle: 'dashed',
+                  paddingVertical: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: pressed ? COLORS.purpleLight : 'transparent',
+                })}
+              >
+                <Text style={{ fontSize: 15, fontWeight: '700', color: COLORS.purple }}>
+                  + Add option
+                </Text>
+              </Pressable>
+            )}
           </View>
 
           {/* Active toggle */}
@@ -800,7 +899,7 @@ export default function PollEditScreen() {
             </Text>
           </Pressable>
 
-          {/* Delete (edit mode only — reset votes moved to Results Summary above) */}
+          {/* Delete (edit mode only) */}
           {isEditing && (
             <Pressable
               onPress={handleDelete}
@@ -836,6 +935,10 @@ export default function PollEditScreen() {
             option_b_label: form.option_b_label,
             option_a_emoji: form.option_a_emoji,
             option_b_emoji: form.option_b_emoji,
+            option_c_label: showC ? form.option_c_label || null : null,
+            option_c_emoji: showC ? form.option_c_emoji || null : null,
+            option_d_label: showD ? form.option_d_label || null : null,
+            option_d_emoji: showD ? form.option_d_emoji || null : null,
             is_active: form.is_active,
             counts,
           }}
@@ -846,5 +949,103 @@ export default function PollEditScreen() {
         />
       )}
     </>
+  );
+}
+
+function OptionRow({
+  letter,
+  color,
+  colorLight,
+  emoji,
+  label,
+  onEmojiChange,
+  onLabelChange,
+  canRemove,
+  onRemove,
+}: {
+  letter: string;
+  color: string;
+  colorLight: string;
+  emoji: string;
+  label: string;
+  onEmojiChange: (v: string) => void;
+  onLabelChange: (v: string) => void;
+  canRemove: boolean;
+  onRemove?: () => void;
+}) {
+  const [labelFocused, setLabelFocused] = useState(false);
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+      {/* Letter badge */}
+      <View style={{
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        backgroundColor: colorLight,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <Text style={{ fontSize: 12, fontWeight: '900', color }}>{letter}</Text>
+      </View>
+
+      {/* Emoji input */}
+      <TextInput
+        value={emoji}
+        onChangeText={onEmojiChange}
+        placeholder="😀"
+        placeholderTextColor="#C0C0D0"
+        maxLength={2}
+        style={{
+          fontSize: 32,
+          width: 56,
+          height: 56,
+          textAlign: 'center',
+          borderRadius: 12,
+          backgroundColor: '#f5f5f5',
+          color: '#1A1A2E',
+        }}
+      />
+
+      {/* Label input */}
+      <TextInput
+        value={label}
+        onChangeText={onLabelChange}
+        placeholder="Option label"
+        placeholderTextColor="#A0A0B8"
+        onFocus={() => setLabelFocused(true)}
+        onBlur={() => setLabelFocused(false)}
+        style={{
+          flex: 1,
+          height: 56,
+          backgroundColor: '#F5F0FF',
+          borderRadius: 14,
+          paddingHorizontal: 14,
+          fontSize: 16,
+          color: '#1A1A2E',
+          borderWidth: 2,
+          borderColor: labelFocused ? color : 'transparent',
+        }}
+      />
+
+      {/* Remove button (C and D only) */}
+      {canRemove ? (
+        <Pressable
+          onPress={onRemove}
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 14,
+            backgroundColor: '#FEE2E2',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ fontSize: 18, color: '#EF4444', lineHeight: 20, fontWeight: '700' }}>−</Text>
+        </Pressable>
+      ) : (
+        <View style={{ width: 28 }} />
+      )}
+    </View>
   );
 }
