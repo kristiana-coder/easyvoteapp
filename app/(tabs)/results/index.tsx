@@ -10,7 +10,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
+import { Download } from 'lucide-react-native';
 import { DonutChart } from '@/components/DonutChart';
+import { ResultsModal } from '@/components/ResultsModal';
 
 const BASE_URL = 'https://at52tm8me4yfm63sgxb9tx3u2csxcjqs.app.specular.dev';
 
@@ -129,6 +131,7 @@ export default function ResultsScreen() {
   const [poll, setPoll] = useState<PollWithCounts | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -325,32 +328,51 @@ export default function ResultsScreen() {
           />
         </View>
 
-        {/* Total */}
-        <View style={{
-          backgroundColor: COLORS.surface,
-          borderRadius: 20,
-          padding: 20,
-          alignItems: 'center',
-          flexDirection: 'row',
-          justifyContent: 'center',
-          gap: 8,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-          borderWidth: 1,
-          borderColor: COLORS.border,
-        }}>
-          <Text style={{ fontSize: 24 }}>🗳️</Text>
-          <Text style={{ fontSize: 20, fontWeight: '800', color: COLORS.text }}>
-            {totalDisplay}
+        {/* Total — tappable to open download modal */}
+        <Pressable
+          onPress={() => {
+            console.log('[ResultsScreen] User tapped total votes card — opening ResultsModal for poll:', poll.id);
+            setShowModal(true);
+          }}
+          style={({ pressed }) => ({
+            backgroundColor: COLORS.surface,
+            borderRadius: 20,
+            padding: 20,
+            alignItems: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            borderWidth: 1,
+            borderColor: COLORS.border,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <Text style={{ fontSize: 24 }}>🗳️</Text>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: COLORS.text }}>
+              {totalDisplay}
+            </Text>
+            <Text style={{ fontSize: 16, color: COLORS.textSecondary, fontWeight: '600' }}>
+              total votes
+            </Text>
+            <Download size={16} color={COLORS.textSecondary} />
+          </View>
+          <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 6 }}>
+            Tap to download
           </Text>
-          <Text style={{ fontSize: 16, color: COLORS.textSecondary, fontWeight: '600' }}>
-            total votes
-          </Text>
-        </View>
+        </Pressable>
 
         <Text style={{ textAlign: 'center', marginTop: 16, fontSize: 13, color: COLORS.textSecondary }}>
           Auto-refreshes every 5 seconds ⚡
         </Text>
       </ScrollView>
+
+      <ResultsModal
+        visible={showModal}
+        poll={poll}
+        onClose={() => {
+          console.log('[ResultsScreen] ResultsModal closed');
+          setShowModal(false);
+        }}
+      />
     </Animated.View>
   );
 }
