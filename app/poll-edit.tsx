@@ -11,13 +11,11 @@ import {
   Animated,
   StyleSheet,
   ImageSourcePropType,
-  Modal,
-  FlatList,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { Trash2, RotateCcw, Save, CheckCircle, ImageIcon, Download, Folder, X, Check } from 'lucide-react-native';
+import { Trash2, RotateCcw, Save, CheckCircle, ImageIcon, Download } from 'lucide-react-native';
 import { ResultsModal } from '@/components/ResultsModal';
 import type { PollWithCounts } from '@/components/ResultsChart';
 import * as ImagePicker from 'expo-image-picker';
@@ -51,13 +49,6 @@ const OPTION_COLORS = [COLORS.coral, COLORS.blue, COLORS.purple, COLORS.amber];
 const OPTION_COLORS_LIGHT = [COLORS.coralLight, COLORS.blueLight, COLORS.purpleLight, COLORS.amberLight];
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
-type Collection = {
-  id: string;
-  name: string;
-  color: string;
-  emoji: string;
-};
-
 type PollForm = {
   title: string;
   description: string;
@@ -71,7 +62,6 @@ type PollForm = {
   option_d_label: string;
   option_d_emoji: string;
   is_active: boolean;
-  collection_id: string | null;
 };
 
 type Counts = { a: number; b: number; c: number; d: number; total: number };
@@ -212,10 +202,7 @@ export default function PollEditScreen() {
     option_d_label: '',
     option_d_emoji: '',
     is_active: false,
-    collection_id: null,
   });
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [showFolderPicker, setShowFolderPicker] = useState(false);
 
   // Track which optional options are active (C and D)
   const [showC, setShowC] = useState(false);
@@ -234,18 +221,6 @@ export default function PollEditScreen() {
 
   const setField = useCallback(<K extends keyof PollForm>(key: K, value: PollForm[K]) => {
     setForm(prev => ({ ...prev, [key]: value }));
-  }, []);
-
-  // Fetch collections for folder picker
-  useEffect(() => {
-    console.log('[PollEdit] Fetching collections for folder picker');
-    fetch(`${BASE_URL}/api/collections`)
-      .then(async res => {
-        if (!res.ok) return;
-        const data = await res.json();
-        setCollections(data.collections ?? data);
-      })
-      .catch(e => console.warn('[PollEdit] Could not load collections:', e));
   }, []);
 
   useEffect(() => {
@@ -280,7 +255,6 @@ export default function PollEditScreen() {
           option_d_label: data.option_d_label ?? '',
           option_d_emoji: data.option_d_emoji ?? '',
           is_active: data.is_active ?? false,
-          collection_id: data.collection_id ?? null,
         });
         if (data.option_c_label) setShowC(true);
         if (data.option_d_label) setShowD(true);
@@ -339,7 +313,6 @@ export default function PollEditScreen() {
       option_b_label: form.option_b_label.trim() || 'Dislike',
       option_b_emoji: form.option_b_emoji.trim() || '👎',
       is_active: form.is_active,
-      collection_id: form.collection_id ?? null,
     };
 
     if (showC && form.option_c_label.trim()) {
@@ -866,68 +839,6 @@ export default function PollEditScreen() {
             )}
           </View>
 
-          {/* Folder assignment */}
-          <View style={{
-            backgroundColor: COLORS.surface,
-            borderRadius: 20,
-            padding: 20,
-            marginBottom: 16,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-            borderWidth: 1,
-            borderColor: COLORS.border,
-          }}>
-            <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.purple, marginBottom: 12, letterSpacing: 1, textTransform: 'uppercase' }}>
-              📁 Folder
-            </Text>
-            <Pressable
-              onPress={() => {
-                console.log('[PollEdit] User opened folder picker. Current collection_id:', form.collection_id);
-                setShowFolderPicker(true);
-              }}
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 12,
-                backgroundColor: pressed ? COLORS.inputBg : COLORS.inputBg,
-                borderRadius: 14,
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-                borderWidth: 2,
-                borderColor: form.collection_id ? COLORS.purple : 'transparent',
-              })}
-            >
-              {form.collection_id ? (() => {
-                const col = collections.find(c => c.id === form.collection_id);
-                return col ? (
-                  <>
-                    <View style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 10,
-                      backgroundColor: col.color + '22',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      <Text style={{ fontSize: 18 }}>{col.emoji}</Text>
-                    </View>
-                    <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: COLORS.text }}>{col.name}</Text>
-                  </>
-                ) : (
-                  <>
-                    <Folder size={20} color={COLORS.textTertiary} />
-                    <Text style={{ flex: 1, fontSize: 16, color: COLORS.textTertiary }}>No folder</Text>
-                  </>
-                );
-              })() : (
-                <>
-                  <Folder size={20} color={COLORS.textTertiary} />
-                  <Text style={{ flex: 1, fontSize: 16, color: COLORS.textTertiary }}>No folder</Text>
-                </>
-              )}
-              <Text style={{ fontSize: 13, color: COLORS.purple, fontWeight: '600' }}>Change</Text>
-            </Pressable>
-          </View>
-
           {/* Active toggle */}
           <View style={{
             backgroundColor: COLORS.surface,
@@ -1010,93 +921,6 @@ export default function PollEditScreen() {
           )}
         </ScrollView>
       </Animated.View>
-
-      {/* Folder picker modal */}
-      <Modal
-        visible={showFolderPicker}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowFolderPicker(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: COLORS.background }}>
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 20,
-            paddingTop: 20,
-            paddingBottom: 16,
-            backgroundColor: COLORS.surface,
-            borderBottomWidth: 1,
-            borderBottomColor: COLORS.border,
-          }}>
-            <Text style={{ fontSize: 20, fontWeight: '900', color: COLORS.text, letterSpacing: -0.3 }}>
-              Choose Folder
-            </Text>
-            <Pressable
-              onPress={() => {
-                console.log('[PollEdit] User closed folder picker');
-                setShowFolderPicker(false);
-              }}
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                backgroundColor: 'rgba(26,26,46,0.08)',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <X size={18} color={COLORS.text} />
-            </Pressable>
-          </View>
-
-          <FlatList
-            data={[{ id: null, name: 'No folder', color: '#999', emoji: '🚫' } as any, ...collections]}
-            keyExtractor={item => item.id ?? '__none__'}
-            contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
-            renderItem={({ item }) => {
-              const isSelected = item.id === null ? form.collection_id === null : form.collection_id === item.id;
-              return (
-                <Pressable
-                  onPress={() => {
-                    const newId = item.id ?? null;
-                    console.log('[PollEdit] User selected folder:', newId, item.name);
-                    setField('collection_id', newId);
-                    setShowFolderPicker(false);
-                  }}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 14,
-                    backgroundColor: isSelected ? COLORS.purpleLight : COLORS.surface,
-                    borderRadius: 16,
-                    padding: 14,
-                    marginBottom: 10,
-                    borderWidth: 2,
-                    borderColor: isSelected ? COLORS.purple : COLORS.border,
-                  }}
-                >
-                  <View style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 14,
-                    backgroundColor: item.color + '22',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <Text style={{ fontSize: 22 }}>{item.emoji}</Text>
-                  </View>
-                  <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: isSelected ? COLORS.purple : COLORS.text }}>
-                    {item.name}
-                  </Text>
-                  {isSelected && <Check size={20} color={COLORS.purple} strokeWidth={3} />}
-                </Pressable>
-              );
-            }}
-          />
-        </View>
-      </Modal>
 
       {/* Results modal for download */}
       {isEditing && counts !== null && (

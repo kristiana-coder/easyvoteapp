@@ -17,12 +17,6 @@ const TABS = [
     label: 'Results',
   },
   {
-    name: 'collections',
-    route: '/(tabs)/collections' as const,
-    icon: 'folder' as const,
-    label: 'Folders',
-  },
-  {
     name: 'admin',
     route: '/(tabs)/admin' as const,
     icon: 'settings' as const,
@@ -41,10 +35,9 @@ export default function TabLayout() {
       >
         <Stack.Screen name="(home)" />
         <Stack.Screen name="results" />
-        <Stack.Screen name="collections" />
         <Stack.Screen name="admin" />
       </Stack>
-      <FloatingTabBar tabs={TABS} containerWidth={340} />
+      <FloatingTabBar tabs={TABS} containerWidth={280} />
     </View>
   );
 }
