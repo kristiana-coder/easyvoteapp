@@ -183,6 +183,17 @@ export async function registerCollectionRoutes(app: App) {
         200: {
           description: 'Collection with polls and combined results',
           type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            description: { type: ['string', 'null'] },
+            color: { type: ['string', 'null'] },
+            emoji: { type: ['string', 'null'] },
+            created_at: { type: 'string', format: 'date-time' },
+            updated_at: { type: 'string', format: 'date-time' },
+            polls: { type: 'array' },
+            combined_results: { type: 'object' },
+          },
         },
         404: {
           description: 'Collection not found',
@@ -302,7 +313,7 @@ export async function registerCollectionRoutes(app: App) {
 
     app.logger.info({ collectionId: id, totalVotes, totalPolls: polls.length }, 'Collection fetched successfully');
 
-    reply.send({
+    return reply.status(200).send({
       id: coll.id,
       name: coll.name,
       description: coll.description,
