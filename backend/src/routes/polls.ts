@@ -74,12 +74,6 @@ export async function registerPollRoutes(app: App) {
     schema: {
       description: 'List all polls ordered by created_at descending',
       tags: ['polls'],
-      querystring: {
-        type: 'object',
-        properties: {
-          collection_id: { type: ['string', 'null'], description: 'Filter by collection ID' },
-        },
-      },
       response: {
         200: {
           description: 'List of polls',
@@ -106,16 +100,6 @@ export async function registerPollRoutes(app: App) {
                   is_active: { type: 'boolean' },
                   created_at: { type: 'string', format: 'date-time' },
                   updated_at: { type: 'string', format: 'date-time' },
-                  counts: {
-                    type: 'object',
-                    properties: {
-                      a: { type: 'integer' },
-                      b: { type: 'integer' },
-                      c: { type: 'integer' },
-                      d: { type: 'integer' },
-                      total: { type: 'integer' },
-                    },
-                  },
                 },
               },
             },
@@ -123,46 +107,14 @@ export async function registerPollRoutes(app: App) {
         },
       },
     },
-  }, async (
-    request: FastifyRequest<{ Querystring: { collection_id?: string } }>,
-    reply: FastifyReply
-  ) => {
-    const { collection_id } = request.query;
-    app.logger.info({ collectionId: collection_id }, 'Fetching all polls');
-
-    let polls;
-    if (collection_id !== undefined) {
-      if (collection_id === 'null' || collection_id === '') {
-        polls = await app.db
-          .select()
-          .from(schema.polls)
-          .where(eq(schema.polls.collection_id, null))
-          .orderBy(desc(schema.polls.created_at));
-      } else {
-        polls = await app.db
-          .select()
-          .from(schema.polls)
-          .where(eq(schema.polls.collection_id, collection_id as string))
-          .orderBy(desc(schema.polls.created_at));
-      }
-    } else {
-      polls = await app.db
-        .select()
-        .from(schema.polls)
-        .orderBy(desc(schema.polls.created_at));
-    }
-
-    const pollsWithCounts = [];
-    for (const poll of polls) {
-      const counts = await getVoteCounts(app, poll.id);
-      pollsWithCounts.push({
-        ...formatPoll(poll),
-        counts,
-      });
-    }
-
-    app.logger.info({ pollCount: pollsWithCounts.length }, 'Polls fetched successfully');
-    return { polls: pollsWithCounts };
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    app.logger.info({}, 'Fetching all polls');
+    const polls = await app.db
+      .select()
+      .from(schema.polls)
+      .orderBy(desc(schema.polls.created_at));
+    app.logger.info({ pollCount: polls.length }, 'Polls fetched successfully');
+    return { polls: polls.map(formatPoll) };
   });
 
   // POST /api/polls - create new poll
@@ -360,7 +312,6 @@ export async function registerPollRoutes(app: App) {
             option_c_emoji: { type: ['string', 'null'] },
             option_d_label: { type: ['string', 'null'] },
             option_d_emoji: { type: ['string', 'null'] },
-            collection_id: { type: ['string', 'null'], format: 'uuid' },
             is_active: { type: 'boolean' },
             created_at: { type: 'string', format: 'date-time' },
             updated_at: { type: 'string', format: 'date-time' },
@@ -570,132 +521,6 @@ export async function registerPollRoutes(app: App) {
     await app.db.delete(schema.polls).where(eq(schema.polls.id, id));
     app.logger.info({ pollId: id }, 'Poll deleted successfully');
     return { success: true };
-  });
-
-  // PUT /api/polls/:id/collection - assign/unassign poll to collection
-  app.fastify.put('/api/polls/:id/collection', {
-    schema: {
-      description: 'Assign or unassign a poll to a collection',
-      tags: ['polls'],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: {
-          id: { type: 'string', format: 'uuid', description: 'Poll ID' },
-        },
-      },
-      body: {
-        type: 'object',
-        required: ['collection_id'],
-        properties: {
-          collection_id: { type: ['string', 'null'], description: 'Collection ID or null to unassign' },
-        },
-      },
-      response: {
-        200: {
-          description: 'Poll collection assignment updated',
-          type: 'object',
-          properties: {
-            poll: {
-              type: 'object',
-              properties: {
-                id: { type: 'string', format: 'uuid' },
-                title: { type: 'string' },
-                description: { type: ['string', 'null'] },
-                image_url: { type: ['string', 'null'] },
-                option_a_label: { type: 'string' },
-                option_b_label: { type: 'string' },
-                option_a_emoji: { type: 'string' },
-                option_b_emoji: { type: 'string' },
-                option_c_label: { type: ['string', 'null'] },
-                option_c_emoji: { type: ['string', 'null'] },
-                option_d_label: { type: ['string', 'null'] },
-                option_d_emoji: { type: ['string', 'null'] },
-                collection_id: { type: ['string', 'null'], format: 'uuid' },
-                is_active: { type: 'boolean' },
-                created_at: { type: 'string', format: 'date-time' },
-                updated_at: { type: 'string', format: 'date-time' },
-                counts: {
-                  type: 'object',
-                  properties: {
-                    a: { type: 'integer' },
-                    b: { type: 'integer' },
-                    c: { type: 'integer' },
-                    d: { type: 'integer' },
-                    total: { type: 'integer' },
-                  },
-                },
-              },
-            },
-          },
-        },
-        400: {
-          description: 'Bad request',
-          type: 'object',
-          properties: {
-            error: { type: 'string' },
-          },
-        },
-        404: {
-          description: 'Poll not found',
-          type: 'object',
-          properties: {
-            error: { type: 'string' },
-          },
-        },
-      },
-    },
-  }, async (
-    request: FastifyRequest<{
-      Params: { id: string };
-      Body: { collection_id: string | null };
-    }>,
-    reply: FastifyReply
-  ) => {
-    const { id } = request.params;
-    const { collection_id } = request.body;
-    app.logger.info({ pollId: id, collectionId: collection_id }, 'Updating poll collection');
-
-    // Check if poll exists
-    const poll = await app.db
-      .select()
-      .from(schema.polls)
-      .where(eq(schema.polls.id, id))
-      .limit(1);
-
-    if (poll.length === 0) {
-      app.logger.warn({ pollId: id }, 'Poll not found');
-      return reply.status(404).send({ error: 'Poll not found' });
-    }
-
-    // If collection_id is provided, verify collection exists
-    if (collection_id !== null && collection_id !== undefined) {
-      const collection = await app.db
-        .select()
-        .from(schema.collections)
-        .where(eq(schema.collections.id, collection_id))
-        .limit(1);
-
-      if (collection.length === 0) {
-        app.logger.warn({ collectionId: collection_id }, 'Collection not found');
-        return reply.status(400).send({ error: 'Collection not found' });
-      }
-    }
-
-    const updated = await app.db
-      .update(schema.polls)
-      .set({ collection_id: collection_id || null, updated_at: new Date() })
-      .where(eq(schema.polls.id, id))
-      .returning();
-
-    const counts = await getVoteCounts(app, id);
-    app.logger.info({ pollId: id, collectionId: collection_id }, 'Poll collection updated successfully');
-    return {
-      poll: {
-        ...formatPoll(updated[0]),
-        counts,
-      },
-    };
   });
 
   // POST /api/polls/:id/votes - insert vote
