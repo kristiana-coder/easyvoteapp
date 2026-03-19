@@ -10,8 +10,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Plus, Pencil, CheckCircle, Download } from 'lucide-react-native';
+import { Plus, Pencil, CheckCircle, Download, Folder } from 'lucide-react-native';
 import { ResultsModal } from '@/components/ResultsModal';
+import { ResultsChart } from '@/components/ResultsChart';
 import type { PollWithCounts } from '@/components/ResultsChart';
 
 const BASE_URL = 'https://at52tm8me4yfm63sgxb9tx3u2csxcjqs.app.specular.dev';
@@ -41,11 +42,16 @@ type Poll = {
   option_b_label: string;
   option_a_emoji: string;
   option_b_emoji: string;
+  option_c_label?: string;
+  option_c_emoji?: string;
+  option_d_label?: string;
+  option_d_emoji?: string;
+  image_url?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
   collection_id?: string | null;
-  counts?: { a: number; b: number; total: number };
+  counts?: { a: number; b: number; c?: number; d?: number; total: number };
 };
 
 type Collection = {
@@ -55,19 +61,40 @@ type Collection = {
   emoji: string;
 };
 
-function MiniBarChart({ countA, countB, total }: { countA: number; countB: number; total: number }) {
+function MiniBarChart({
+  countA,
+  countB,
+  countC,
+  countD,
+  total,
+}: {
+  countA: number;
+  countB: number;
+  countC?: number;
+  countD?: number;
+  total: number;
+}) {
   const widthA = useRef(new Animated.Value(0)).current;
   const widthB = useRef(new Animated.Value(0)).current;
+  const widthC = useRef(new Animated.Value(0)).current;
+  const widthD = useRef(new Animated.Value(0)).current;
 
   const pctA = total > 0 ? countA / total : 0;
   const pctB = total > 0 ? countB / total : 0;
+  const pctC = total > 0 ? (countC ?? 0) / total : 0;
+  const pctD = total > 0 ? (countD ?? 0) / total : 0;
+
+  const showC = (countC ?? 0) > 0;
+  const showD = (countD ?? 0) > 0;
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(widthA, { toValue: pctA, duration: 600, delay: 100, useNativeDriver: false }),
       Animated.timing(widthB, { toValue: pctB, duration: 600, delay: 200, useNativeDriver: false }),
+      Animated.timing(widthC, { toValue: pctC, duration: 600, delay: 300, useNativeDriver: false }),
+      Animated.timing(widthD, { toValue: pctD, duration: 600, delay: 400, useNativeDriver: false }),
     ]).start();
-  }, [pctA, pctB]);
+  }, [pctA, pctB, pctC, pctD]);
 
   const totalDisplay = total.toString();
 
@@ -95,6 +122,22 @@ function MiniBarChart({ countA, countB, total }: { countA: number; countB: numbe
           borderRadius: 4,
           backgroundColor: COLORS.blue,
         }} />
+        {showC && (
+          <Animated.View style={{
+            flex: widthC,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: COLORS.purple,
+          }} />
+        )}
+        {showD && (
+          <Animated.View style={{
+            flex: widthD,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: COLORS.yellow,
+          }} />
+        )}
       </View>
       <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.textSecondary }}>
         {totalDisplay}
@@ -120,6 +163,7 @@ function PollCard({
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(16)).current;
   const scale = useRef(new Animated.Value(1)).current;
+  const [showChart, setShowChart] = useState(false);
 
   React.useEffect(() => {
     Animated.parallel([
@@ -137,7 +181,34 @@ function PollCard({
 
   const countA = poll.counts?.a ?? 0;
   const countB = poll.counts?.b ?? 0;
+  const countC = poll.counts?.c;
+  const countD = poll.counts?.d;
   const countTotal = poll.counts?.total ?? 0;
+
+  const pollWithCounts: PollWithCounts = {
+    id: poll.id,
+    title: poll.title,
+    description: poll.description,
+    image_url: poll.image_url,
+    option_a_label: poll.option_a_label,
+    option_b_label: poll.option_b_label,
+    option_a_emoji: poll.option_a_emoji,
+    option_b_emoji: poll.option_b_emoji,
+    option_c_label: poll.option_c_label,
+    option_c_emoji: poll.option_c_emoji,
+    option_d_label: poll.option_d_label,
+    option_d_emoji: poll.option_d_emoji,
+    is_active: poll.is_active,
+    counts: {
+      a: countA,
+      b: countB,
+      c: countC ?? 0,
+      d: countD ?? 0,
+      total: countTotal,
+    },
+  };
+
+  const toggleLabel = showChart ? '▴ Hide' : '📊 Results ▾';
 
   return (
     <Animated.View style={{ opacity, transform: [{ translateY }, { scale }], marginBottom: 12 }}>
@@ -217,13 +288,33 @@ function PollCard({
                 borderRadius: 8,
                 marginTop: 6,
               }}>
-                <Text style={{ fontSize: 11 }}>{collection.emoji}</Text>
+                <Folder size={11} color={collection.color} />
                 <Text style={{ fontSize: 11, fontWeight: '700', color: collection.color }}>{collection.name}</Text>
               </View>
             ) : null}
 
             {/* Mini bar chart */}
-            <MiniBarChart countA={countA} countB={countB} total={countTotal} />
+            <MiniBarChart countA={countA} countB={countB} countC={countC} countD={countD} total={countTotal} />
+
+            {/* Results toggle */}
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                console.log('[PollCard] User toggled results chart for poll:', poll.id, 'showChart:', !showChart);
+                setShowChart(prev => !prev);
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '700', color: COLORS.purple, marginTop: 8 }}>
+                {toggleLabel}
+              </Text>
+            </Pressable>
+
+            {/* Inline results chart */}
+            {showChart && (
+              <View style={{ marginTop: 12 }}>
+                <ResultsChart poll={pollWithCounts} />
+              </View>
+            )}
           </View>
 
           {/* Action buttons column */}
@@ -247,16 +338,22 @@ function PollCard({
             </Pressable>
 
             {/* Edit button */}
-            <View style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              backgroundColor: COLORS.purpleLight,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                onPress();
+              }}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                backgroundColor: COLORS.purpleLight,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <Pencil size={16} color={COLORS.purple} />
-            </View>
+            </Pressable>
           </View>
         </View>
       </Pressable>
@@ -311,7 +408,23 @@ export default function AdminScreen() {
               const r = await fetch(`${BASE_URL}/api/polls/${p.id}`);
               if (!r.ok) return p;
               const d = await r.json();
-              return { ...p, counts: d.counts };
+              return {
+                ...p,
+                option_c_label: d.option_c_label,
+                option_c_emoji: d.option_c_emoji,
+                option_d_label: d.option_d_label,
+                option_d_emoji: d.option_d_emoji,
+                image_url: d.image_url,
+                counts: d.counts
+                  ? {
+                      a: d.counts.a,
+                      b: d.counts.b,
+                      c: d.counts.c,
+                      d: d.counts.d,
+                      total: d.counts.total,
+                    }
+                  : undefined,
+              };
             } catch {
               return p;
             }
@@ -377,8 +490,12 @@ export default function AdminScreen() {
         option_b_label: data.option_b_label,
         option_a_emoji: data.option_a_emoji,
         option_b_emoji: data.option_b_emoji,
+        option_c_label: data.option_c_label,
+        option_c_emoji: data.option_c_emoji,
+        option_d_label: data.option_d_label,
+        option_d_emoji: data.option_d_emoji,
         is_active: data.is_active,
-        counts: data.counts ?? { a: 0, b: 0, total: 0 },
+        counts: data.counts ?? { a: 0, b: 0, c: 0, d: 0, total: 0 },
       };
       setModalPoll(pollWithCounts);
     } catch (e) {
