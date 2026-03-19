@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Vote App",
-    "slug": "easyvoteapp",
+    "slug": "vote-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon-mdl.png",

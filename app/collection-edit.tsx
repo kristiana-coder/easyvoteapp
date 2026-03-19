@@ -12,8 +12,7 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Save, Trash2, Check } from 'lucide-react-native';
-
-const BASE_URL = 'https://at52tm8me4yfm63sgxb9tx3u2csxcjqs.app.specular.dev';
+import { BASE_URL } from '@/utils/api';
 
 const PRESET_COLORS = ['#FF6B6B', '#4ECDC4', '#A855F7', '#F59E0B', '#3B82F6', '#10B981'];
 

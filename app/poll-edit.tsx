@@ -22,8 +22,7 @@ import { ResultsModal } from '@/components/ResultsModal';
 import type { PollWithCounts } from '@/components/ResultsChart';
 import * as ImagePicker from 'expo-image-picker';
 import { DonutChart, BarOption } from '@/components/DonutChart';
-
-const BASE_URL = 'https://at52tm8me4yfm63sgxb9tx3u2csxcjqs.app.specular.dev';
+import { BASE_URL } from '@/utils/api';
 
 const COLORS = {
   background: '#FAF8FF',

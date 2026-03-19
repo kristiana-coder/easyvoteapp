@@ -13,8 +13,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Plus, Pencil, CheckCircle, Download } from 'lucide-react-native';
 import { ResultsModal } from '@/components/ResultsModal';
 import type { PollWithCounts } from '@/components/ResultsChart';
-
-const BASE_URL = 'https://at52tm8me4yfm63sgxb9tx3u2csxcjqs.app.specular.dev';
+import { BASE_URL } from '@/utils/api';
 
 const COLORS = {
   background: '#F5F0FF',

@@ -15,8 +15,7 @@ import { Pencil, Download } from 'lucide-react-native';
 import { DonutChart, BarOption } from '@/components/DonutChart';
 import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
-
-const BASE_URL = 'https://at52tm8me4yfm63sgxb9tx3u2csxcjqs.app.specular.dev';
+import { BASE_URL } from '@/utils/api';
 
 const OPTION_COLORS: Record<string, string> = {
   a: '#FF6B6B',

@@ -11,8 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Plus, Folder } from 'lucide-react-native';
-
-const BASE_URL = 'https://at52tm8me4yfm63sgxb9tx3u2csxcjqs.app.specular.dev';
+import { BASE_URL } from '@/utils/api';
 
 const COLORS = {
   background: '#FAF8FF',
