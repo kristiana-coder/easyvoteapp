@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Vote App",
-    "slug": "vote-app",
+    "slug": "easyvoteapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon-mdl.png",
@@ -23,7 +23,7 @@
         "foregroundImage": "./assets/images/app-icon-mdl.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.placeholder.app"
+      "package": "com.Easyvoteapp.myapp"
     },
     "web": {
       "favicon": "./assets/images/final_quest_240x240.png",
@@ -41,7 +41,7 @@
     },
     "extra": {
       "router": {},
-      "backendUrl": "https://9rytjv42kzp2h49c6s4fnqhsaferyefa.app.specular.dev"
+      "backendUrl": "https://at52tm8me4yfm63sgxb9tx3u2csxcjqs.app.specular.dev"
     }
   }
 }

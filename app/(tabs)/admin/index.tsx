@@ -44,7 +44,15 @@ type Poll = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  collection_id?: string | null;
   counts?: { a: number; b: number; total: number };
+};
+
+type Collection = {
+  id: string;
+  name: string;
+  color: string;
+  emoji: string;
 };
 
 function MiniBarChart({ countA, countB, total }: { countA: number; countB: number; total: number }) {
@@ -99,11 +107,13 @@ function MiniBarChart({ countA, countB, total }: { countA: number; countB: numbe
 function PollCard({
   poll,
   index,
+  collection,
   onPress,
   onDownloadPress,
 }: {
   poll: Poll;
   index: number;
+  collection?: Collection;
   onPress: () => void;
   onDownloadPress: () => void;
 }) {
@@ -194,6 +204,24 @@ function PollCard({
               {poll.option_b_label}
             </Text>
 
+            {/* Folder badge */}
+            {collection ? (
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                alignSelf: 'flex-start',
+                backgroundColor: collection.color + '18',
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 8,
+                marginTop: 6,
+              }}>
+                <Text style={{ fontSize: 11 }}>{collection.emoji}</Text>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: collection.color }}>{collection.name}</Text>
+              </View>
+            ) : null}
+
             {/* Mini bar chart */}
             <MiniBarChart countA={countA} countB={countB} total={countTotal} />
           </View>
@@ -240,6 +268,7 @@ export default function AdminScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [polls, setPolls] = useState<Poll[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -248,18 +277,29 @@ export default function AdminScreen() {
   const contentOpacity = useRef(new Animated.Value(0)).current;
 
   const fetchPolls = useCallback(async () => {
-    console.log('[AdminScreen] Fetching all polls from', `${BASE_URL}/api/polls`);
+    console.log('[AdminScreen] Fetching polls and collections from', BASE_URL);
     try {
-      const res = await fetch(`${BASE_URL}/api/polls`);
-      if (!res.ok) {
-        const text = await res.text();
-        console.error('[AdminScreen] Error fetching polls:', res.status, text);
+      const [pollsRes, collectionsRes] = await Promise.all([
+        fetch(`${BASE_URL}/api/polls`),
+        fetch(`${BASE_URL}/api/collections`),
+      ]);
+
+      if (!pollsRes.ok) {
+        const text = await pollsRes.text();
+        console.error('[AdminScreen] Error fetching polls:', pollsRes.status, text);
         setError('Could not load polls');
         return;
       }
-      const data = await res.json();
-      const pollList: Poll[] = data.polls ?? data;
+      const pollData = await pollsRes.json();
+      const pollList: Poll[] = pollData.polls ?? pollData;
       console.log('[AdminScreen] Polls loaded:', pollList.length, 'polls');
+
+      if (collectionsRes.ok) {
+        const colData = await collectionsRes.json();
+        const colList: Collection[] = colData.collections ?? colData;
+        console.log('[AdminScreen] Collections loaded:', colList.length);
+        setCollections(colList);
+      }
 
       // Check if counts are already included; if not, fetch individually
       const hasCounts = pollList.length > 0 && pollList[0].counts !== undefined;
@@ -495,6 +535,7 @@ export default function AdminScreen() {
               <PollCard
                 poll={poll}
                 index={index}
+                collection={poll.collection_id ? collections.find(c => c.id === poll.collection_id) : undefined}
                 onPress={() => handleEditPoll(poll.id)}
                 onDownloadPress={() => handleDownloadPress(poll)}
               />
