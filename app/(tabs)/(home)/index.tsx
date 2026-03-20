@@ -12,7 +12,7 @@ import {
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const BASE_URL = 'https://at52tm8me4yfm63sgxb9tx3u2csxcjqs.app.specular.dev';
+const BASE_URL = 'https://9rytjv42kzp2h49c6s4fnqhsaferyefa.app.specular.dev';
 
 const COLORS = {
   background: '#FFF9F0',

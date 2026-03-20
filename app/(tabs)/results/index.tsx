@@ -14,7 +14,7 @@ import { Download } from 'lucide-react-native';
 import { DonutChart, BarOption } from '@/components/DonutChart';
 import { ResultsModal } from '@/components/ResultsModal';
 
-const BASE_URL = 'https://at52tm8me4yfm63sgxb9tx3u2csxcjqs.app.specular.dev';
+const BASE_URL = 'https://9rytjv42kzp2h49c6s4fnqhsaferyefa.app.specular.dev';
 
 const COLORS = {
   background: '#F0F8FF',
