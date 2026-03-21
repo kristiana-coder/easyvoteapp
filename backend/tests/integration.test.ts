@@ -194,7 +194,12 @@ describe("API Integration Tests", () => {
     await expectStatus(res, 201);
     const data = await res.json();
     expect(data.success).toBe(true);
-    expect(data.counts).toBeDefined();
+  });
+
+  test("Verify vote was recorded", async () => {
+    const res = await api(`/api/polls/${pollId}`);
+    await expectStatus(res, 200);
+    const data = await res.json();
     expect(data.counts.a).toBe(1);
     expect(data.counts.total).toBe(1);
   });
@@ -209,6 +214,13 @@ describe("API Integration Tests", () => {
       }),
     });
     await expectStatus(res, 201);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+  });
+
+  test("Verify second vote was recorded", async () => {
+    const res = await api(`/api/polls/${pollId}`);
+    await expectStatus(res, 200);
     const data = await res.json();
     expect(data.counts.total).toBe(2);
   });
@@ -324,6 +336,10 @@ describe("API Integration Tests", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: "Minimal Poll",
+        option_a_label: "Yes",
+        option_b_label: "No",
+        option_a_emoji: "✅",
+        option_b_emoji: "❌",
       }),
     });
     await expectStatus(res, 201);
@@ -337,6 +353,18 @@ describe("API Integration Tests", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         description: "No title provided",
+      }),
+    });
+    await expectStatus(res, 400);
+  });
+
+  test("Create poll without required option fields", async () => {
+    const res = await api("/api/polls", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Missing Options",
+        option_a_label: "Yes",
       }),
     });
     await expectStatus(res, 400);
@@ -356,6 +384,7 @@ describe("API Integration Tests", () => {
         option_b_emoji: "🅱️",
         option_c_emoji: "©️",
         option_d_emoji: "🅳",
+        is_active: true,
       }),
     });
     await expectStatus(res, 201);
@@ -377,6 +406,13 @@ describe("API Integration Tests", () => {
     });
     await expectStatus(res, 201);
     const data = await res.json();
+    expect(data.success).toBe(true);
+  });
+
+  test("Verify option C vote was recorded", async () => {
+    const res = await api(`/api/polls/${fourOptionPollId}`);
+    await expectStatus(res, 200);
+    const data = await res.json();
     expect(data.counts.c).toBe(1);
   });
 
@@ -390,6 +426,13 @@ describe("API Integration Tests", () => {
       }),
     });
     await expectStatus(res, 201);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+  });
+
+  test("Verify option D vote was recorded", async () => {
+    const res = await api(`/api/polls/${fourOptionPollId}`);
+    await expectStatus(res, 200);
     const data = await res.json();
     expect(data.counts.d).toBe(1);
   });

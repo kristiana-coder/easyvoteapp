@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { App } from '../index.js';
-import { eq, and, desc, count as dbCount } from 'drizzle-orm';
+import { eq, desc, count as dbCount } from 'drizzle-orm';
 import * as schema from '../db/schema/schema.js';
 import { randomUUID } from 'crypto';
 
@@ -18,6 +18,7 @@ interface PollWithCounts {
   option_d_label: string | null;
   option_d_emoji: string | null;
   is_active: boolean;
+  collection_id: string | null;
   created_at: Date;
   updated_at: Date;
   counts: {
@@ -100,6 +101,16 @@ export async function registerPollRoutes(app: App) {
                   is_active: { type: 'boolean' },
                   created_at: { type: 'string', format: 'date-time' },
                   updated_at: { type: 'string', format: 'date-time' },
+                  counts: {
+                    type: 'object',
+                    properties: {
+                      a: { type: 'integer' },
+                      b: { type: 'integer' },
+                      c: { type: 'integer' },
+                      d: { type: 'integer' },
+                      total: { type: 'integer' },
+                    },
+                  },
                 },
               },
             },
@@ -113,8 +124,33 @@ export async function registerPollRoutes(app: App) {
       .select()
       .from(schema.polls)
       .orderBy(desc(schema.polls.created_at));
-    app.logger.info({ pollCount: polls.length }, 'Polls fetched successfully');
-    return { polls: polls.map(formatPoll) };
+
+    const pollsWithCounts: PollWithCounts[] = [];
+    for (const poll of polls) {
+      const counts = await getVoteCounts(app, poll.id);
+      pollsWithCounts.push({
+        id: poll.id,
+        title: poll.title,
+        description: poll.description,
+        image_url: poll.image_url,
+        option_a_label: poll.option_a_label,
+        option_b_label: poll.option_b_label,
+        option_a_emoji: poll.option_a_emoji,
+        option_b_emoji: poll.option_b_emoji,
+        option_c_label: poll.option_c_label,
+        option_c_emoji: poll.option_c_emoji,
+        option_d_label: poll.option_d_label,
+        option_d_emoji: poll.option_d_emoji,
+        is_active: poll.is_active,
+        collection_id: poll.collection_id,
+        created_at: poll.created_at,
+        updated_at: poll.updated_at,
+        counts,
+      });
+    }
+
+    app.logger.info({ pollCount: pollsWithCounts.length }, 'Polls fetched successfully');
+    return { polls: pollsWithCounts };
   });
 
   // POST /api/polls - create new poll
@@ -124,20 +160,21 @@ export async function registerPollRoutes(app: App) {
       tags: ['polls'],
       body: {
         type: 'object',
-        required: ['title'],
+        required: ['title', 'option_a_label', 'option_a_emoji', 'option_b_label', 'option_b_emoji'],
         properties: {
           title: { type: 'string' },
-          description: { type: 'string' },
-          image_url: { type: 'string' },
+          description: { type: ['string', 'null'] },
+          image_url: { type: ['string', 'null'] },
           option_a_label: { type: 'string' },
           option_b_label: { type: 'string' },
           option_a_emoji: { type: 'string' },
           option_b_emoji: { type: 'string' },
-          option_c_label: { type: 'string' },
-          option_c_emoji: { type: 'string' },
-          option_d_label: { type: 'string' },
-          option_d_emoji: { type: 'string' },
+          option_c_label: { type: ['string', 'null'] },
+          option_c_emoji: { type: ['string', 'null'] },
+          option_d_label: { type: ['string', 'null'] },
+          option_d_emoji: { type: ['string', 'null'] },
           is_active: { type: 'boolean' },
+          collection_id: { type: ['string', 'null'], format: 'uuid' },
         },
       },
       response: {
@@ -158,8 +195,19 @@ export async function registerPollRoutes(app: App) {
             option_d_label: { type: ['string', 'null'] },
             option_d_emoji: { type: ['string', 'null'] },
             is_active: { type: 'boolean' },
+            collection_id: { type: ['string', 'null'], format: 'uuid' },
             created_at: { type: 'string', format: 'date-time' },
             updated_at: { type: 'string', format: 'date-time' },
+            counts: {
+              type: 'object',
+              properties: {
+                a: { type: 'integer' },
+                b: { type: 'integer' },
+                c: { type: 'integer' },
+                d: { type: 'integer' },
+                total: { type: 'integer' },
+              },
+            },
           },
         },
       },
@@ -168,22 +216,23 @@ export async function registerPollRoutes(app: App) {
     request: FastifyRequest<{
       Body: {
         title: string;
-        description?: string;
-        image_url?: string;
-        option_a_label?: string;
-        option_b_label?: string;
-        option_a_emoji?: string;
-        option_b_emoji?: string;
-        option_c_label?: string;
-        option_c_emoji?: string;
-        option_d_label?: string;
-        option_d_emoji?: string;
+        description?: string | null;
+        image_url?: string | null;
+        option_a_label: string;
+        option_b_label: string;
+        option_a_emoji: string;
+        option_b_emoji: string;
+        option_c_label?: string | null;
+        option_c_emoji?: string | null;
+        option_d_label?: string | null;
+        option_d_emoji?: string | null;
         is_active?: boolean;
+        collection_id?: string | null;
       };
     }>,
     reply: FastifyReply
   ) => {
-    const { title, description, image_url, option_a_label, option_b_label, option_a_emoji, option_b_emoji, option_c_label, option_c_emoji, option_d_label, option_d_emoji, is_active } = request.body;
+    const { title, description, image_url, option_a_label, option_b_label, option_a_emoji, option_b_emoji, option_c_label, option_c_emoji, option_d_label, option_d_emoji, is_active, collection_id } = request.body;
     app.logger.info({ title, is_active }, 'Creating new poll');
 
     // If is_active is true, set all other polls to inactive
@@ -200,22 +249,24 @@ export async function registerPollRoutes(app: App) {
         title,
         description: description || null,
         image_url: image_url || null,
-        option_a_label: option_a_label || 'Like',
-        option_b_label: option_b_label || 'Dislike',
-        option_a_emoji: option_a_emoji || '👍',
-        option_b_emoji: option_b_emoji || '👎',
+        option_a_label,
+        option_b_label,
+        option_a_emoji,
+        option_b_emoji,
         option_c_label: option_c_label || null,
         option_c_emoji: option_c_emoji || null,
         option_d_label: option_d_label || null,
         option_d_emoji: option_d_emoji || null,
-        is_active: is_active !== undefined ? is_active : true,
+        is_active: is_active !== undefined ? is_active : false,
+        collection_id: collection_id || null,
         created_at: new Date(),
         updated_at: new Date(),
       })
       .returning();
 
+    const counts = await getVoteCounts(app, newPoll[0].id);
     app.logger.info({ pollId: newPoll[0].id }, 'Poll created successfully');
-    return reply.status(201).send(formatPoll(newPoll[0]));
+    return reply.status(201).send({ ...formatPoll(newPoll[0]), counts });
   });
 
   // GET /api/polls/active - get active poll with counts (must be before :id route)
@@ -406,6 +457,23 @@ export async function registerPollRoutes(app: App) {
             is_active: { type: 'boolean' },
             created_at: { type: 'string', format: 'date-time' },
             updated_at: { type: 'string', format: 'date-time' },
+            counts: {
+              type: 'object',
+              properties: {
+                a: { type: 'integer' },
+                b: { type: 'integer' },
+                c: { type: 'integer' },
+                d: { type: 'integer' },
+                total: { type: 'integer' },
+              },
+            },
+          },
+        },
+        404: {
+          description: 'Poll not found',
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
           },
         },
       },
@@ -452,7 +520,7 @@ export async function registerPollRoutes(app: App) {
       await app.db
         .update(schema.polls)
         .set({ is_active: false, updated_at: new Date() })
-        .where(and(eq(schema.polls.is_active, true), eq(schema.polls.id, id)));
+        .where(eq(schema.polls.is_active, true));
     }
 
     const updates: Partial<typeof schema.polls.$inferSelect> = { updated_at: new Date() };
@@ -476,8 +544,9 @@ export async function registerPollRoutes(app: App) {
       .where(eq(schema.polls.id, id))
       .returning();
 
+    const counts = await getVoteCounts(app, id);
     app.logger.info({ pollId: id }, 'Poll updated successfully');
-    return reply.status(200).send(formatPoll(updated[0]));
+    return reply.status(200).send({ ...formatPoll(updated[0]), counts });
   });
 
   // DELETE /api/polls/:id
@@ -498,6 +567,14 @@ export async function registerPollRoutes(app: App) {
           type: 'object',
           properties: {
             success: { type: 'boolean' },
+            id: { type: 'string', format: 'uuid' },
+          },
+        },
+        404: {
+          description: 'Poll not found',
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
           },
         },
       },
@@ -520,7 +597,7 @@ export async function registerPollRoutes(app: App) {
 
     await app.db.delete(schema.polls).where(eq(schema.polls.id, id));
     app.logger.info({ pollId: id }, 'Poll deleted successfully');
-    return { success: true };
+    return { success: true, id };
   });
 
   // POST /api/polls/:id/votes - insert vote
@@ -549,16 +626,21 @@ export async function registerPollRoutes(app: App) {
           type: 'object',
           properties: {
             success: { type: 'boolean' },
-            counts: {
-              type: 'object',
-              properties: {
-                a: { type: 'integer' },
-                b: { type: 'integer' },
-                c: { type: 'integer' },
-                d: { type: 'integer' },
-                total: { type: 'integer' },
-              },
-            },
+            choice: { type: 'string' },
+          },
+        },
+        400: {
+          description: 'Bad request',
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
+          },
+        },
+        404: {
+          description: 'Poll not found',
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
           },
         },
       },
@@ -592,6 +674,12 @@ export async function registerPollRoutes(app: App) {
       return reply.status(404).send({ error: 'Poll not found' });
     }
 
+    // Validate poll is active
+    if (!poll[0].is_active) {
+      app.logger.warn({ pollId: id }, 'Poll is not active');
+      return reply.status(400).send({ error: 'Poll is not active' });
+    }
+
     await app.db.insert(schema.votes).values({
       poll_id: id,
       choice,
@@ -599,9 +687,8 @@ export async function registerPollRoutes(app: App) {
       created_at: new Date(),
     });
 
-    const counts = await getVoteCounts(app, id);
-    app.logger.info({ pollId: id, counts }, 'Vote recorded successfully');
-    return reply.status(201).send({ success: true, counts });
+    app.logger.info({ pollId: id, choice }, 'Vote recorded successfully');
+    return reply.status(201).send({ success: true, choice });
   });
 
   // POST /api/polls/:id/reset - delete all votes for poll
@@ -622,6 +709,14 @@ export async function registerPollRoutes(app: App) {
           type: 'object',
           properties: {
             success: { type: 'boolean' },
+            deleted_count: { type: 'integer' },
+          },
+        },
+        404: {
+          description: 'Poll not found',
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
           },
         },
       },
@@ -642,9 +737,15 @@ export async function registerPollRoutes(app: App) {
       return reply.status(404).send({ error: 'Poll not found' });
     }
 
+    // Count votes before deleting
+    const votesToDelete = await app.db
+      .select()
+      .from(schema.votes)
+      .where(eq(schema.votes.poll_id, id));
+
     await app.db.delete(schema.votes).where(eq(schema.votes.poll_id, id));
-    app.logger.info({ pollId: id }, 'Poll votes reset successfully');
-    return { success: true };
+    app.logger.info({ pollId: id, deletedCount: votesToDelete.length }, 'Poll votes reset successfully');
+    return { success: true, deleted_count: votesToDelete.length };
   });
 
   // POST /api/upload - file upload endpoint
@@ -754,52 +855,55 @@ export async function seedPolls(app: App) {
   const pollsData = [
     {
       id: '11111111-1111-1111-1111-111111111111' as any,
-      title: 'Do you like pizza? 🍕',
-      description: 'Tell us how you feel about pizza!',
-      image_url: 'https://picsum.photos/seed/pizza/600/400',
-      option_a_label: 'Love it!',
-      option_b_label: 'Not for me',
-      option_a_emoji: '❤️',
-      option_b_emoji: '😕',
-      option_c_label: null,
-      option_c_emoji: null,
-      option_d_label: null,
-      option_d_emoji: null,
+      title: 'What\'s your favourite pizza topping?',
+      description: null,
+      image_url: null,
+      option_a_label: 'Cheese',
+      option_b_label: 'Pepperoni',
+      option_a_emoji: '🍕',
+      option_b_emoji: '🥩',
+      option_c_label: 'Spicy',
+      option_c_emoji: '🌶️',
+      option_d_label: 'Mushroom',
+      option_d_emoji: '🍄',
       is_active: true,
+      collection_id: '11111111-1111-1111-1111-111111111111' as any,
       created_at: new Date(),
       updated_at: new Date(),
     },
     {
       id: '22222222-2222-2222-2222-222222222222' as any,
-      title: 'Do you like dogs? 🐶',
-      description: 'Are you a dog person?',
-      image_url: 'https://picsum.photos/seed/dogs/600/400',
-      option_a_label: 'Yes!',
-      option_b_label: 'Not really',
-      option_a_emoji: '🐾',
-      option_b_emoji: '😐',
+      title: 'Dogs or Cats?',
+      description: null,
+      image_url: null,
+      option_a_label: 'Dogs',
+      option_b_label: 'Cats',
+      option_a_emoji: '🐶',
+      option_b_emoji: '🐱',
       option_c_label: null,
       option_c_emoji: null,
       option_d_label: null,
       option_d_emoji: null,
       is_active: false,
+      collection_id: '22222222-2222-2222-2222-222222222222' as any,
       created_at: new Date(),
       updated_at: new Date(),
     },
     {
       id: '33333333-3333-3333-3333-333333333333' as any,
-      title: 'Do you like ice cream? 🍦',
-      description: 'What do you think about ice cream?',
-      image_url: 'https://picsum.photos/seed/icecream/600/400',
-      option_a_label: 'Yummy!',
-      option_b_label: 'No thanks',
-      option_a_emoji: '😋',
-      option_b_emoji: '🙅',
-      option_c_label: null,
-      option_c_emoji: null,
-      option_d_label: null,
-      option_d_emoji: null,
+      title: 'Favourite season?',
+      description: null,
+      image_url: null,
+      option_a_label: 'Summer',
+      option_b_label: 'Winter',
+      option_a_emoji: '☀️',
+      option_b_emoji: '❄️',
+      option_c_label: 'Autumn',
+      option_c_emoji: '🍂',
+      option_d_label: 'Spring',
+      option_d_emoji: '🌸',
       is_active: false,
+      collection_id: null,
       created_at: new Date(),
       updated_at: new Date(),
     },
@@ -807,29 +911,4 @@ export async function seedPolls(app: App) {
 
   await app.db.insert(schema.polls).values(pollsData);
   app.logger.info({ count: pollsData.length }, 'Polls seeded successfully');
-
-  // Insert seed votes for the first poll
-  const votesData = [
-    { poll_id: '11111111-1111-1111-1111-111111111111' as any, choice: 'a', voter_name: 'Emma' },
-    { poll_id: '11111111-1111-1111-1111-111111111111' as any, choice: 'a', voter_name: 'Liam' },
-    { poll_id: '11111111-1111-1111-1111-111111111111' as any, choice: 'a', voter_name: 'Olivia' },
-    { poll_id: '11111111-1111-1111-1111-111111111111' as any, choice: 'a', voter_name: 'Noah' },
-    { poll_id: '11111111-1111-1111-1111-111111111111' as any, choice: 'a', voter_name: 'Ava' },
-    { poll_id: '11111111-1111-1111-1111-111111111111' as any, choice: 'a', voter_name: 'Ethan' },
-    { poll_id: '11111111-1111-1111-1111-111111111111' as any, choice: 'a', voter_name: 'Sophia' },
-    { poll_id: '11111111-1111-1111-1111-111111111111' as any, choice: 'a', voter_name: 'Mason' },
-    { poll_id: '11111111-1111-1111-1111-111111111111' as any, choice: 'b', voter_name: 'Isabella' },
-    { poll_id: '11111111-1111-1111-1111-111111111111' as any, choice: 'b', voter_name: 'James' },
-    { poll_id: '11111111-1111-1111-1111-111111111111' as any, choice: 'b', voter_name: 'Mia' },
-    { poll_id: '11111111-1111-1111-1111-111111111111' as any, choice: 'b', voter_name: 'Lucas' },
-    { poll_id: '11111111-1111-1111-1111-111111111111' as any, choice: 'b', voter_name: 'Charlotte' },
-  ];
-
-  const votesWithDates = votesData.map((vote) => ({
-    ...vote,
-    created_at: new Date(),
-  }));
-
-  await app.db.insert(schema.votes).values(votesWithDates);
-  app.logger.info({ count: votesWithDates.length }, 'Votes seeded successfully');
 }

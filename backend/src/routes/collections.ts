@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { App } from '../index.js';
-import { eq, desc, count as dbCount, or, ilike } from 'drizzle-orm';
+import { eq, desc, count as dbCount } from 'drizzle-orm';
 import * as schema from '../db/schema/schema.js';
 
 interface CollectionWithPollCount {
@@ -110,6 +110,7 @@ export async function registerCollectionRoutes(app: App) {
             description: { type: ['string', 'null'] },
             color: { type: ['string', 'null'] },
             emoji: { type: ['string', 'null'] },
+            poll_count: { type: 'integer' },
             created_at: { type: 'string', format: 'date-time' },
             updated_at: { type: 'string', format: 'date-time' },
           },
@@ -162,6 +163,7 @@ export async function registerCollectionRoutes(app: App) {
       description: newCollection[0].description,
       color: newCollection[0].color,
       emoji: newCollection[0].emoji,
+      poll_count: 0,
       created_at: newCollection[0].created_at,
       updated_at: newCollection[0].updated_at,
     });
@@ -183,6 +185,18 @@ export async function registerCollectionRoutes(app: App) {
         200: {
           description: 'Collection with polls and combined results',
           type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            description: { type: ['string', 'null'] },
+            color: { type: ['string', 'null'] },
+            emoji: { type: ['string', 'null'] },
+            poll_count: { type: 'integer' },
+            created_at: { type: 'string', format: 'date-time' },
+            updated_at: { type: 'string', format: 'date-time' },
+            polls: { type: 'array' },
+            combined_results: { type: 'object' },
+          },
         },
         404: {
           description: 'Collection not found',
@@ -277,7 +291,7 @@ export async function registerCollectionRoutes(app: App) {
       const labels = Array.from(labelsByOption[option]).filter((l) => l !== null);
       const mostCommonLabel = labels.length > 0 ? labels[0] : null;
       const total = combinedCounts[option as keyof typeof combinedCounts];
-      const percentage = totalVotes > 0 ? Math.round((total / totalVotes) * 100) : 0;
+      const percentage = totalVotes > 0 ? Math.round((total / totalVotes * 100) * 10) / 10 : 0;
 
       byOption[option] = {
         label: mostCommonLabel,
@@ -308,6 +322,7 @@ export async function registerCollectionRoutes(app: App) {
       description: coll.description,
       color: coll.color,
       emoji: coll.emoji,
+      poll_count: polls.length,
       created_at: coll.created_at,
       updated_at: coll.updated_at,
       polls: pollsWithCounts,
@@ -346,6 +361,7 @@ export async function registerCollectionRoutes(app: App) {
             description: { type: ['string', 'null'] },
             color: { type: ['string', 'null'] },
             emoji: { type: ['string', 'null'] },
+            poll_count: { type: 'integer' },
             created_at: { type: 'string', format: 'date-time' },
             updated_at: { type: 'string', format: 'date-time' },
           },
@@ -400,6 +416,12 @@ export async function registerCollectionRoutes(app: App) {
       .where(eq(schema.collections.id, id))
       .returning();
 
+    // Get poll count
+    const pollCount = await app.db
+      .select({ count: dbCount(schema.polls.id) })
+      .from(schema.polls)
+      .where(eq(schema.polls.collection_id, id));
+
     app.logger.info({ collectionId: id }, 'Collection updated successfully');
     return reply.status(200).send({
       id: updated[0].id,
@@ -407,6 +429,7 @@ export async function registerCollectionRoutes(app: App) {
       description: updated[0].description,
       color: updated[0].color,
       emoji: updated[0].emoji,
+      poll_count: pollCount[0]?.count || 0,
       created_at: updated[0].created_at,
       updated_at: updated[0].updated_at,
     });
@@ -430,6 +453,7 @@ export async function registerCollectionRoutes(app: App) {
           type: 'object',
           properties: {
             success: { type: 'boolean' },
+            id: { type: 'string', format: 'uuid' },
           },
         },
         404: {
@@ -465,7 +489,7 @@ export async function registerCollectionRoutes(app: App) {
 
     await app.db.delete(schema.collections).where(eq(schema.collections.id, id));
     app.logger.info({ collectionId: id }, 'Collection deleted successfully');
-    return { success: true };
+    return { success: true, id };
   });
 }
 
@@ -482,19 +506,19 @@ export async function seedCollections(app: App) {
   const collectionsData = [
     {
       id: '11111111-1111-1111-1111-111111111111' as any,
-      name: 'Food Preferences 🍕',
+      name: 'Favourite Foods',
       emoji: '🍕',
       color: '#FF6B6B',
-      description: 'What foods do kids like?',
+      description: null,
       created_at: new Date(),
       updated_at: new Date(),
     },
     {
       id: '22222222-2222-2222-2222-222222222222' as any,
-      name: 'Animals 🐾',
+      name: 'Animals',
       emoji: '🐾',
       color: '#4ECDC4',
-      description: 'Which animals do kids prefer?',
+      description: null,
       created_at: new Date(),
       updated_at: new Date(),
     },
@@ -502,24 +526,4 @@ export async function seedCollections(app: App) {
 
   await app.db.insert(schema.collections).values(collectionsData);
   app.logger.info({ count: collectionsData.length }, 'Collections seeded successfully');
-
-  // Update existing polls to reference collections
-  // Pizza and Ice Cream → Food collection
-  await app.db
-    .update(schema.polls)
-    .set({ collection_id: '11111111-1111-1111-1111-111111111111' as any, updated_at: new Date() })
-    .where(
-      or(
-        ilike(schema.polls.title, '%pizza%'),
-        ilike(schema.polls.title, '%ice cream%')
-      )
-    );
-
-  // Dogs → Animals collection
-  await app.db
-    .update(schema.polls)
-    .set({ collection_id: '22222222-2222-2222-2222-222222222222' as any, updated_at: new Date() })
-    .where(ilike(schema.polls.title, '%dog%'));
-
-  app.logger.info({}, 'Polls updated with collection_ids');
 }
