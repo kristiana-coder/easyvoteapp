@@ -1,1 +1,1 @@
-export const BASE_URL = 'https://9rytjv42kzp2h49c6s4fnqhsaferyefa.app.specular.dev';
+export const BASE_URL = 'https://fd5r32f8kn87q2eyghdha5gsc6ucn2xb.app.specular.dev';

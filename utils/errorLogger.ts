@@ -321,8 +321,7 @@ export const setupErrorLogging = () => {
     const message = stringifyArgs(args);
     if (shouldMuteMessage(message)) return;
 
-    // Always call original first
-    originalConsoleError.apply(console, args);
+    // Always call original first	;
 
     const source = getCallerInfo();
     queueLog('error', message, source);
@@ -359,8 +358,5 @@ export const setupErrorLogging = () => {
   }
 };
 
-// Auto-initialize logging when this module is imported
-// Only run in development mode - production apps don't need log forwarding
-if (__DEV__) {
-  setupErrorLogging();
-}
+// Also export extractSourceLocation in case it's needed externally
+export { extractSourceLocation };

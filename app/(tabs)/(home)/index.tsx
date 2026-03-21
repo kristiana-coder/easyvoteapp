@@ -11,8 +11,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const BASE_URL = 'https://9rytjv42kzp2h49c6s4fnqhsaferyefa.app.specular.dev';
+import { BASE_URL } from '@/utils/api';
 
 const COLORS = {
   background: '#FFF9F0',

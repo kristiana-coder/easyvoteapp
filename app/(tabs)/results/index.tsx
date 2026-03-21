@@ -13,8 +13,7 @@ import { useFocusEffect } from 'expo-router';
 import { Download } from 'lucide-react-native';
 import { DonutChart, BarOption } from '@/components/DonutChart';
 import { ResultsModal } from '@/components/ResultsModal';
-
-const BASE_URL = 'https://9rytjv42kzp2h49c6s4fnqhsaferyefa.app.specular.dev';
+import { BASE_URL } from '@/utils/api';
 
 const COLORS = {
   background: '#F0F8FF',

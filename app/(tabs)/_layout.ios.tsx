@@ -12,6 +12,10 @@ export default function TabLayout() {
         <Icon sf="chart.bar.fill" />
         <Label>Results</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="collections">
+        <Icon sf="folder.fill" />
+        <Label>Folders</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="admin">
         <Icon sf="gearshape.fill" />
         <Label>Admin</Label>

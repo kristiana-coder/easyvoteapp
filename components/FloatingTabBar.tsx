@@ -56,13 +56,14 @@ export default function FloatingTabBar({
 
     tabs.forEach((tab, index) => {
       let score = 0;
+      const routeStr = tab.route as string;
 
       // Exact route match gets highest score
-      if (pathname === tab.route) {
+      if (pathname === routeStr) {
         score = 100;
       }
       // Check if pathname starts with tab route (for nested routes)
-      else if (pathname.startsWith(tab.route as string)) {
+      else if (pathname.startsWith(routeStr)) {
         score = 80;
       }
       // Check if pathname contains the tab name
@@ -70,7 +71,7 @@ export default function FloatingTabBar({
         score = 60;
       }
       // Check for partial matches in the route
-      else if (tab.route.includes('/(tabs)/') && pathname.includes(tab.route.split('/(tabs)/')[1])) {
+      else if (routeStr.includes('/(tabs)/') && pathname.includes(routeStr.split('/(tabs)/')[1])) {
         score = 40;
       }
 
@@ -174,14 +175,16 @@ export default function FloatingTabBar({
               const isActive = activeTabIndex === index;
 
               return (
-                <React.Fragment key={index}>
                 <TouchableOpacity
-                  key={index} // Use index as key
+                  key={tab.name}
                   style={styles.tab}
-                  onPress={() => handleTabPress(tab.route)}
+                  onPress={() => {
+                    console.log('[FloatingTabBar] Tab pressed:', tab.label, tab.route);
+                    handleTabPress(tab.route);
+                  }}
                   activeOpacity={0.7}
                 >
-                  <View key={index} style={styles.tabContent}>
+                  <View style={styles.tabContent}>
                     <IconSymbol
                       android_material_icon_name={tab.icon}
                       ios_icon_name={tab.icon}
@@ -199,7 +202,6 @@ export default function FloatingTabBar({
                     </Text>
                   </View>
                 </TouchableOpacity>
-                </React.Fragment>
               );
             })}
           </View>
